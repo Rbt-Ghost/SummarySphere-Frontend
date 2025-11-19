@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sun, Moon } from "lucide-react";
 
-import CTAButton from "../components/CTAButton";
+import CTAButton from "../components/CTAbutton";
 import Footer from "../components/Footer";
 
 export default function Dashboard() {
