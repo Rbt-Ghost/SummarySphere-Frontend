@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 
 export default function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white dark:bg-black dark:text-white transition-colors">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white dark:bg-slate-900 dark:text-white transition-colors">
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}

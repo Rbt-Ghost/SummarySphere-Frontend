@@ -2,11 +2,14 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sun, Moon } from "lucide-react";
 
+import CTAButton from "../components/CTAButton";
+import Footer from "../components/Footer";
+
 export default function Dashboard() {
   const [dark, setDark] = useState(true);
 
   return (
-    <div className={dark ? "min-h-screen bg-black text-white flex flex-col items-center justify-center px-6" : "min-h-screen bg-white text-black flex flex-col items-center justify-center px-6"}>
+    <div className={dark ? "min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-6" : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"}>
       <button
         onClick={() => setDark(!dark)}
         className="absolute top-6 right-6 p-3 rounded-full bg-neutral-800 dark:bg-neutral-200 shadow-xl"
@@ -23,28 +26,23 @@ export default function Dashboard() {
         Summary Sphere
       </motion.h1>
 
-      <motion.button
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="px-10 py-4 rounded-2xl bg-neutral-900 text-white dark:bg-neutral-100 dark:text-black shadow-2xl text-lg font-semibold hover:scale-105 transition-transform"
-      >
-        Let's get started
-      </motion.button>
+      <CTAButton dark={dark}>Let's get started</CTAButton>
 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.4 }}
-        className="mt-8"
+        className="mt-2"
       >
         <a
           href="#"
           className="text-sm underline opacity-70 hover:opacity-100 transition-opacity"
         >
-          View other courses
+          View documents list
         </a>
       </motion.div>
+
+      <Footer dark={dark} />
     </div>
   );
 }
