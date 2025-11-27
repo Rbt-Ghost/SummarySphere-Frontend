@@ -44,7 +44,12 @@ export default function Dashboard() {
         Summary Sphere
       </motion.h1>
 
-      <CTAButton dark={dark}>Let's get started</CTAButton>
+      <CTAButton 
+        dark={dark}
+        onClick={() => window.location.href = "/upload"}
+      >
+        Let's get started
+      </CTAButton>
 
       <motion.div
         initial={{ opacity: 0 }}
