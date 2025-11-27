@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Sun, Moon } from "lucide-react";
 
@@ -6,7 +6,25 @@ import CTAButton from "../components/CTAbutton";
 import Footer from "../components/Footer";
 
 export default function Dashboard() {
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => {
+    if(typeof window !== "undefined") {
+      const savedMode = localStorage.getItem("darkMode");
+      if(savedMode !== null) {
+        return JSON.parse(savedMode);
+      }
+      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("darkMode", JSON.stringify(dark));
+    if (dark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [dark]);
 
   return (
     <div className={dark ? "min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-6" : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"}>
