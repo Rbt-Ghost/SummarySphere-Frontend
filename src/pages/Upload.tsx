@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { UploadCloud, FileText, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function Upload() {
-
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
       try {
@@ -29,6 +28,26 @@ export default function Upload() {
 
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [recentFiles, setRecentFiles] = useState<File[]>([]);
+
+  const processFiles = (filesList: FileList | null) => {
+    if (!filesList) return;
+    const files = Array.from(filesList);
+    const maxSize = 20 * 1024 * 1024; // 20MB
+    const tooLarge = files.filter((f) => f.size > maxSize);
+    if (tooLarge.length > 0) {
+      alert(`Some files exceed the 20MB limit and were skipped.`);
+    }
+    const accepted = files.filter((f) => f.size <= maxSize);
+    if (accepted.length === 0) return;
+    setRecentFiles((prev) => {
+      const merged = [...accepted, ...prev];
+      return merged.slice(0, 6); // keep last 6
+    });
+    // TODO: upload logic here (e.g., send accepted to server)
+    console.log("Accepted files:", accepted);
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -42,8 +61,13 @@ export default function Upload() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    // Handle your file upload logic here
-    console.log(e.dataTransfer.files);
+    processFiles(e.dataTransfer.files);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files);
+    // reset input so same file can be selected again if needed
+    e.currentTarget.value = "";
   };
 
   return (
@@ -75,6 +99,7 @@ export default function Upload() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
           className={`
             relative flex flex-col items-center justify-center w-full h-64 rounded-2xl border-2 border-dashed transition-all cursor-pointer
             ${
@@ -93,19 +118,35 @@ export default function Upload() {
               <span className="font-bold">Click to upload</span> or drag and drop
             </p>
             <p className={`text-sm ${dark ? "text-slate-400" : "text-zinc-500"}`}>
-              PDF, DOCX, or TXT (MAX. 10MB)
+              PDF, DOCX, or TXT (MAX. 20MB)
             </p>
           </div>
-          <input id="dropzone-file" type="file" className="hidden" />
+          <input
+            id="dropzone-file"
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileSelect}
+            accept=".pdf,.doc,.docx,.txt"
+            multiple
+          />
         </div>
 
         {/* Example of a recently uploaded file list */}
         <div className="mt-8 space-y-3">
-            <p className="text-sm font-medium opacity-60 ml-1">Recent uploads</p>
+          <p className="text-sm font-medium opacity-60 ml-1">Recent uploads</p>
+          {recentFiles.length === 0 ? (
             <div className={`flex items-center p-3 rounded-lg ${dark ? 'bg-slate-800' : 'bg-white shadow-sm'}`}>
-                <FileText className="w-5 h-5 mr-3 text-blue-500" />
-                <span className="text-sm">lecture_notes_week1.pdf</span>
+              <span className="text-sm opacity-60">No uploads yet</span>
             </div>
+          ) : (
+            recentFiles.map((f, idx) => (
+              <div key={idx} className={`flex items-center p-3 rounded-lg ${dark ? 'bg-slate-800' : 'bg-white shadow-sm'}`}>
+                <FileText className="w-5 h-5 mr-3 text-blue-500" />
+                <span className="text-sm truncate" title={f.name}>{f.name}</span>
+              </div>
+            ))
+          )} 
         </div>
       </motion.div>
     </div>
