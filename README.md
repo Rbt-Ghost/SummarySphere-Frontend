@@ -1,73 +1,30 @@
-# React + TypeScript + Vite
+# Summary Sphere
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Summary Sphere** AI-Powered Course Summarization Microservice that allows students to upload course materials (PDF, Word, or text), process them through an AI summarization model, and retrieve structured, concise summaries.
+This microservice helps students study efficiently by turning long documents into clear, well-organized summaries.
 
-Currently, two official plugins are available:
+## Repository Infos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+You're currently looking at the game's front-end code. Click [here](https://github.com/BCBeno/SummarySphere-BackEnd) to see the back-end code.
 
-## React Compiler
+The repository is mantained by:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+<a href="https://github.com/Rbt-Ghost">
+    <img src="https://github.com/Rbt-Ghost.png" width="64px"/>
+</a>
 
-## Expanding the ESLint configuration
+<a href="https://github.com/BCBeno">
+    <img src="https://github.com/BCBeno.png" width="64px"/>
+</a>
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Technologies Used (Back-end)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Programming Language: TypeScript
+- Technologies: ReactJS, TailwindCSS
+- Source Control: Git
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+![Technologies](https://skillicons.dev/icons?i=typescript,react,tailwindcss,git)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Project Status
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Under Development
