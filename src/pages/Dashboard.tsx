@@ -56,6 +56,7 @@ export default function Dashboard() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.4 }}
         className="mt-2"
+        onClick={() => window.location.href = "/documents"}
       >
         <a
           href="#"
