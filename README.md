@@ -17,7 +17,7 @@ The repository is mantained by:
     <img src="https://github.com/BCBeno.png" width="64px"/>
 </a>
 
-## Technologies Used (Back-end)
+## Technologies Used
 
 - Programming Language: TypeScript
 - Technologies: ReactJS, TailwindCSS
@@ -25,6 +25,6 @@ The repository is mantained by:
 
 ![Technologies](https://skillicons.dev/icons?i=typescript,react,tailwindcss,git)
 
-## Project Status
+## Current Stage
 
 Under Development
