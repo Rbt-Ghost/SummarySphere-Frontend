@@ -51,7 +51,7 @@ export default function Documents() {
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/documents");
+        const response = await fetch("/api/documents");
         if (response.ok) {
           const data = await response.json();
           setDocuments(data);
@@ -70,7 +70,7 @@ export default function Documents() {
   const handleDelete = async (id: string) => {
     if(confirm("Are you sure you want to delete this document?")) {
       try {
-        const response = await fetch(`http://localhost:8000/api/documents/${id}`, {
+        const response = await fetch(`/api/documents/${id}`, { //
           method: "DELETE",
         });
         if (response.ok) {
@@ -84,7 +84,7 @@ export default function Documents() {
 
   // 3. Handle Document Download
   const handleDownload = (id: string) => {
-    window.open(`http://localhost:8000/api/documents/download/${id}`, "_blank");
+    window.open(`/api/documents/${id}/file`, "_blank");
   };
 
   const handleSummarize = (id: string) => {

@@ -7,9 +7,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      // This proxies any request starting with /api to your backend
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8080', // Change from 8000 to 8080
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
