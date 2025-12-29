@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   FileText, 
   ArrowLeft, 
-  Trash2, 
-  Eye, 
+  Trash2,
   PlayCircle, 
   Download, 
   CheckCircle2, 
@@ -14,18 +13,16 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-// Types for our mock data
+// Interface updated to match DocumentDTO from backend
 interface Doc {
   id: string;
-  title: string;
-  type: string;
-  size: string;
-  status: "pending" | "processing" | "completed";
+  fileName: string;
+  fileType: string;
+  status: string;
   uploadDate: string;
 }
 
 export default function Documents() {
-  // --- Dark Mode Logic (Matching your Upload.tsx pattern) ---
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
       try {
@@ -45,62 +42,57 @@ export default function Documents() {
       else document.documentElement.classList.remove("dark");
     } catch { /* ignore */ }
   }, [dark]);
-  // -----------------------------------------------------------
 
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
 
-  // Simulate fetching data from API
+  // 1. Fetch documents from the backend on mount
   useEffect(() => {
-    const fetchDocs = () => {
-      setTimeout(() => {
-        setDocuments([
-          {
-            id: "1",
-            title: "Intro to Artificial Intelligence.pdf",
-            type: "PDF",
-            size: "2.4 MB",
-            status: "completed",
-            uploadDate: "2023-10-24",
-          },
-          {
-            id: "2",
-            title: "History_of_Rome_Notes.docx",
-            type: "DOCX",
-            size: "1.1 MB",
-            status: "pending",
-            uploadDate: "2023-10-25",
-          },
-          {
-            id: "3",
-            title: "Quantum_Physics_Abstract.txt",
-            type: "TXT",
-            size: "15 KB",
-            status: "processing",
-            uploadDate: "2023-10-26",
-          },
-        ]);
+    const fetchDocs = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/api/documents");
+        if (response.ok) {
+          const data = await response.json();
+          setDocuments(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch documents:", error);
+      } finally {
         setIsLoading(false);
-      }, 800);
+      }
     };
 
     fetchDocs();
   }, []);
 
-  const handleDelete = (id: string) => {
+  // 2. Handle Document Deletion
+  const handleDelete = async (id: string) => {
     if(confirm("Are you sure you want to delete this document?")) {
-      setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+      try {
+        const response = await fetch(`http://localhost:8000/api/documents/${id}`, {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+        }
+      } catch (error) {
+        alert("Error deleting document");
+      }
     }
   };
 
+  // 3. Handle Document Download
+  const handleDownload = (id: string) => {
+    window.open(`http://localhost:8000/api/documents/download/${id}`, "_blank");
+  };
+
   const handleSummarize = (id: string) => {
-    // Optimistic update to show "Processing" UI immediately
+    // Placeholder for AI summarization logic (Backend currently only supports storage)
     setDocuments((prev) =>
       prev.map((doc) => (doc.id === id ? { ...doc, status: "processing" } : doc))
     );
     
-    // Simulate API call to summarize
     setTimeout(() => {
         setDocuments((prev) =>
             prev.map((doc) => (doc.id === id ? { ...doc, status: "completed" } : doc))
@@ -112,11 +104,10 @@ export default function Documents() {
     <div
       className={
         dark
-          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24" // Added pt-24 for top spacing
+          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24"
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24"
       }
     >
-      {/* Navigation Header */}
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <button
           onClick={() => navigate("/")}
@@ -144,21 +135,18 @@ export default function Documents() {
       >
         <h2 className="text-3xl font-bold mb-6">My Documents</h2>
 
-        {/* Loading State */}
         {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-10 h-10 animate-spin opacity-50 mb-4" />
-                <p className="opacity-50">Loading documents...</p>
+                <p className="opacity-50">Loading documents from server...</p>
             </div>
         ) : documents.length === 0 ? (
-            /* Empty State */
             <div className={`text-center py-16 rounded-2xl border-2 border-dashed ${dark ? 'border-slate-800' : 'border-zinc-300'}`}>
                 <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <h3 className="text-lg font-medium mb-1">No documents found</h3>
                 <p className="opacity-60 text-sm">Upload a document to get started.</p>
             </div>
         ) : (
-            /* Document List */
             <div className="space-y-4">
             <AnimatePresence>
                 {documents.map((doc) => (
@@ -176,60 +164,46 @@ export default function Documents() {
                         }
                     `}
                 >
-                    {/* File Info */}
                     <div className="flex items-start gap-4 mb-4 md:mb-0">
                         <div className={`p-3 rounded-lg ${dark ? 'bg-slate-700' : 'bg-zinc-100'}`}>
                             <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                            <h3 className="font-semibold truncate max-w-[200px] sm:max-w-xs">{doc.title}</h3>
+                            <h3 className="font-semibold truncate max-w-[200px] sm:max-w-xs">{doc.fileName}</h3>
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
-                                <span>{doc.type}</span>
+                                <span>{doc.fileType}</span>
                                 <span>•</span>
-                                <span>{doc.size}</span>
-                                <span>•</span>
-                                <span>{doc.uploadDate}</span>
+                                <span>{new Date(doc.uploadDate).toLocaleDateString()}</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Status & Actions */}
                     <div className="flex items-center gap-4 justify-between md:justify-end w-full md:w-auto">
-                        
-                        {/* Status Badge */}
                         <div className={`
                             px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5
-                            ${doc.status === 'completed' 
+                            ${doc.status === 'COMPLETED' 
                                 ? 'bg-green-500/10 text-green-500' 
-                                : doc.status === 'processing'
+                                : doc.status === 'PROCESSING'
                                 ? 'bg-blue-500/10 text-blue-500'
                                 : 'bg-yellow-500/10 text-yellow-500'
                             }
                         `}>
-                            {doc.status === 'completed' && <CheckCircle2 className="w-3 h-3" />}
-                            {doc.status === 'processing' && <Loader2 className="w-3 h-3 animate-spin" />}
-                            {doc.status === 'pending' && <Clock className="w-3 h-3" />}
-                            <span className="capitalize">{doc.status}</span>
+                            {doc.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
+                            {doc.status === 'PROCESSING' && <Loader2 className="w-3 h-3 animate-spin" />}
+                            {(doc.status === 'PENDING' || !doc.status) && <Clock className="w-3 h-3" />}
+                            <span className="capitalize">{doc.status || 'Pending'}</span>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex items-center gap-2">
-                            {doc.status === 'completed' ? (
-                                <>
-                                    <button 
-                                        title="View Summary"
-                                        className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
-                                    >
-                                        <Eye className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        title="Download PDF"
-                                        className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
-                                    >
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                </>
-                            ) : doc.status === 'pending' ? (
+                            <button 
+                                onClick={() => handleDownload(doc.id)}
+                                title="Download"
+                                className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+
+                            {(!doc.status || doc.status === 'PENDING') && (
                                 <button
                                     onClick={() => handleSummarize(doc.id)}
                                     className={`
@@ -240,7 +214,7 @@ export default function Documents() {
                                     <PlayCircle className="w-3 h-3" />
                                     Summarize
                                 </button>
-                            ) : null}
+                            )}
 
                             <div className={`w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
 
