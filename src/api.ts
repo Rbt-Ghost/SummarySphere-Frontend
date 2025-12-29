@@ -1,9 +1,9 @@
-const BASE_URL = "http://localhost:8000/api/documents";
+const BASE_URL = "http://localhost:8000/";
 
 export const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    const response = await fetch('${BASE_URL}/upload', {
+    const response = await fetch(`${BASE_URL}/upload`, {
         method: "POST",
         body: formData,
     });
@@ -19,6 +19,6 @@ export const deleteDocument = async (id: string) => {
   await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
 };
 
-export const downloadDocument = (id: string, fileName: string) => {
+export const downloadDocument = (id: string) => {
   window.open(`${BASE_URL}/download/${id}`, "_blank");
 };
