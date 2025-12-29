@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { UploadCloud, FileText, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { uploadFile } from "../api"; // <-- add this import
 
 export default function Upload() {
   const [dark] = useState(() => {
@@ -31,22 +32,35 @@ export default function Upload() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [recentFiles, setRecentFiles] = useState<File[]>([]);
 
-  const processFiles = (filesList: FileList | null) => {
+  const processFiles = async (filesList: FileList | null) => {
     if (!filesList) return;
     const files = Array.from(filesList);
     const maxSize = 20 * 1024 * 1024; // 20MB
+    
     const tooLarge = files.filter((f) => f.size > maxSize);
     if (tooLarge.length > 0) {
       alert(`Some files exceed the 20MB limit and were skipped.`);
     }
+
     const accepted = files.filter((f) => f.size <= maxSize);
     if (accepted.length === 0) return;
-    setRecentFiles((prev) => {
-      const merged = [...accepted, ...prev];
-      return merged.slice(0, 6); // keep last 6
-    });
-    // TODO: upload logic here (e.g., send accepted to server)
-    console.log("Accepted files:", accepted);
+
+    // Iterate through each accepted file and upload to the backend
+    for (const file of accepted) {
+      try {
+        const result = await uploadFile(file); // use the shared API function
+        console.log("Upload successful:", result);
+
+        // Update the UI with the successfully uploaded file metadata
+        setRecentFiles((prev) => {
+          const merged = [file, ...prev];
+          return merged.slice(0, 6);
+        });
+      } catch (error: any) {
+        console.error("Network error during upload:", error);
+        alert(`Could not connect to the server to upload ${file.name}.`);
+      }
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
