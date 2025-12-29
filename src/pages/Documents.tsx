@@ -19,7 +19,7 @@ interface Doc {
   fileName: string;
   fileType: string;
   status: string;
-  uploadDate: string;
+  uploadedAt: string; // <--- CHANGED from uploadDate to uploadedAt
 }
 
 export default function Documents() {
@@ -53,7 +53,6 @@ export default function Documents() {
         const response = await fetch("/api/documents");
         if (response.ok) {
           const apiDocs = await response.json();
-          // Directly set documents from API (now includes title)
           setDocuments(apiDocs);
         }
       } catch (error) {
@@ -165,14 +164,14 @@ export default function Documents() {
                             <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                            {/* Display Title from API, fallback to fileName */}
                             <h3 className="font-semibold truncate max-w-[200px] sm:max-w-xs" title={doc.title || doc.fileName}>
                                 {doc.title || doc.fileName}
                             </h3>
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
                                 <span className="truncate max-w-[150px]" title={doc.fileName}>{doc.fileName}</span>
                                 <span>•</span>
-                                <span>{new Date(doc.uploadDate).toLocaleDateString()}</span>
+                                {/* Updated Date Field */}
+                                <span>{new Date(doc.uploadedAt).toLocaleDateString()}</span>
                             </div>
                         </div>
                     </div>
