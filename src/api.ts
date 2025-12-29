@@ -1,9 +1,10 @@
 // src/api.ts
 const BASE_URL = "/api/documents"; 
 
-export const uploadFile = async (file: File) => {
+export const uploadFile = async (file: File, title: string) => {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("title", title); // Send title to the new backend endpoint
     
     const response = await fetch(`${BASE_URL}`, {
         method: "POST",

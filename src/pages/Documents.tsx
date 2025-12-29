@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-// Interface updated to match DocumentDTO from backend
 interface Doc {
   id: string;
+  title?: string;
   fileName: string;
   fileType: string;
   status: string;
@@ -47,14 +47,14 @@ export default function Documents() {
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
 
-  // 1. Fetch documents from the backend on mount
   useEffect(() => {
     const fetchDocs = async () => {
       try {
         const response = await fetch("/api/documents");
         if (response.ok) {
-          const data = await response.json();
-          setDocuments(data);
+          const apiDocs = await response.json();
+          // Directly set documents from API (now includes title)
+          setDocuments(apiDocs);
         }
       } catch (error) {
         console.error("Failed to fetch documents:", error);
@@ -66,11 +66,10 @@ export default function Documents() {
     fetchDocs();
   }, []);
 
-  // 2. Handle Document Deletion
   const handleDelete = async (id: string) => {
     if(confirm("Are you sure you want to delete this document?")) {
       try {
-        const response = await fetch(`/api/documents/${id}`, { //
+        const response = await fetch(`/api/documents/${id}`, {
           method: "DELETE",
         });
         if (response.ok) {
@@ -82,17 +81,14 @@ export default function Documents() {
     }
   };
 
-  // 3. Handle Document Download
   const handleDownload = (id: string) => {
     window.open(`/api/documents/${id}/file`, "_blank");
   };
 
   const handleSummarize = (id: string) => {
-    // Placeholder for AI summarization logic (Backend currently only supports storage)
     setDocuments((prev) =>
       prev.map((doc) => (doc.id === id ? { ...doc, status: "processing" } : doc))
     );
-    
     setTimeout(() => {
         setDocuments((prev) =>
             prev.map((doc) => (doc.id === id ? { ...doc, status: "completed" } : doc))
@@ -169,9 +165,12 @@ export default function Documents() {
                             <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                            <h3 className="font-semibold truncate max-w-[200px] sm:max-w-xs">{doc.fileName}</h3>
+                            {/* Display Title from API, fallback to fileName */}
+                            <h3 className="font-semibold truncate max-w-[200px] sm:max-w-xs" title={doc.title || doc.fileName}>
+                                {doc.title || doc.fileName}
+                            </h3>
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
-                                <span>{doc.fileType}</span>
+                                <span className="truncate max-w-[150px]" title={doc.fileName}>{doc.fileName}</span>
                                 <span>•</span>
                                 <span>{new Date(doc.uploadDate).toLocaleDateString()}</span>
                             </div>
