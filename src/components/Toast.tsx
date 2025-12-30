@@ -1,11 +1,22 @@
 // src/components/toast.tsx
-import { Toaster, toast as hotToast } from "react-hot-toast";
+import { useEffect } from "react";
+import { Toaster, toast as hotToast, useToasterStore } from "react-hot-toast";
 
 interface ToastProps {
   dark: boolean;
 }
 
 export const ToastProvider = ({ dark }: ToastProps) => {
+  const { toasts } = useToasterStore();
+  const TOAST_LIMIT = 7;
+
+  useEffect(() => {
+    toasts
+      .filter((t) => t.visible) // Only check visible toasts
+      .filter((_, i) => i >= TOAST_LIMIT) // Identify toasts exceeding the limit (newest are at index 0)
+      .forEach((t) => hotToast.dismiss(t.id)); // Dismiss the excess (oldest)
+  }, [toasts]);
+
   return (
     <Toaster
       position="top-center"
