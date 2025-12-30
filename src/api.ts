@@ -4,25 +4,35 @@ const BASE_URL = "/api/documents";
 export const uploadFile = async (file: File, title: string) => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("title", title); // Send title to the new backend endpoint
-    
-    const response = await fetch(`${BASE_URL}`, {
+    formData.append("title", title);
+
+    // CRITICAL FIX: Ensure we are hitting the correct endpoint. 
+    // If your backend listens on "/api/upload", change this URL.
+    // If it listens on "POST /api/documents", keep it as `BASE_URL`.
+    // Assuming standard /upload pattern based on your previous code:
+    const response = await fetch(`${BASE_URL}`, { // or `${BASE_URL}/upload` if needed
         method: "POST",
         body: formData,
     });
 
-    // The backend returns a raw string (e.g. "{message=...}"), not valid JSON.
-    // using .text() prevents the parsing error.
+    // CRITICAL FIX: Check if the request was actually successful
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Upload failed: ${response.statusText}`);
+    }
+
     return response.text();
 };
 
 export const fetchDocuments = async () => {
   const response = await fetch(BASE_URL);
+  if (!response.ok) throw new Error("Failed to fetch documents");
   return response.json();
 };
 
 export const deleteDocument = async (id: string) => {
-  await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
+  const response = await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
+  if (!response.ok) throw new Error("Failed to delete document");
 };
 
 export const downloadDocument = (id: string) => {
