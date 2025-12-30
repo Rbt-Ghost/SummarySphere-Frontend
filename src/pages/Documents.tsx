@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import Footer from "../components/Footer";
+
 interface Doc {
   id: string;
   title?: string;
@@ -107,8 +109,8 @@ export default function Documents() {
     <div
       className={
         dark
-          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24"
-          : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24"
+          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24 relative pb-20"
+          : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"
       }
     >
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
@@ -238,6 +240,8 @@ export default function Documents() {
             </div>
         )}
       </motion.div>
+
+      <Footer dark={dark} />
     </div>
   );
 }

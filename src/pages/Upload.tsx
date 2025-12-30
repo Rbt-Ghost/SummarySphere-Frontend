@@ -4,6 +4,8 @@ import { UploadCloud, FileText, ArrowLeft, X, CheckCircle, AlertCircle } from "l
 import { useNavigate } from "react-router-dom";
 import { uploadFile } from "../api";
 
+import Footer from "../components/Footer";
+
 export default function Upload() {
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -228,6 +230,8 @@ export default function Upload() {
         </div>
 
       </motion.div>
+      
+      <Footer dark={dark} />
     </div>
   );
 }
