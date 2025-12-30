@@ -38,9 +38,16 @@ export default function Documents() {
 
   useEffect(() => {
     try {
-      if (dark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
+      if (dark) {
+        document.documentElement.classList.add("dark");
+        document.body.style.backgroundColor = "#0f172a"; // bg-slate-900
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.body.style.backgroundColor = "#f4f4f5"; // bg-zinc-200
+      }
     } catch { /* ignore */ }
+    return () => { document.body.style.backgroundColor = "";  
+    }; 
   }, [dark]);
 
   const navigate = useNavigate();
