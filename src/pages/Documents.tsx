@@ -19,7 +19,7 @@ interface Doc {
   fileName: string;
   fileType: string;
   status: string;
-  uploadedAt: string; // <--- CHANGED from uploadDate to uploadedAt
+  uploadedAt: string; 
 }
 
 export default function Documents() {
@@ -53,7 +53,8 @@ export default function Documents() {
         const response = await fetch("/api/documents");
         if (response.ok) {
           const apiDocs = await response.json();
-          setDocuments(apiDocs);
+          // Reverse the array to show newest documents first
+          setDocuments(apiDocs.reverse());
         }
       } catch (error) {
         console.error("Failed to fetch documents:", error);
@@ -170,7 +171,6 @@ export default function Documents() {
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
                                 <span className="truncate max-w-[150px]" title={doc.fileName}>{doc.fileName}</span>
                                 <span>•</span>
-                                {/* Updated Date Field */}
                                 <span>{new Date(doc.uploadedAt).toLocaleDateString()}</span>
                             </div>
                         </div>
