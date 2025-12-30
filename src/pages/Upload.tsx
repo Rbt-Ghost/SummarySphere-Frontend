@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, FileText, ArrowLeft, X, CheckCircle, AlertCircle } from "lucide-react";
+import { motion } from "framer-motion"; // AnimatePresence is no longer needed for the toast
+import { UploadCloud, FileText, ArrowLeft, X } from "lucide-react"; // Removed CheckCircle, AlertCircle
 import { useNavigate } from "react-router-dom";
 import { uploadFile } from "../api";
 
 import Footer from "../components/Footer";
+import { ToastProvider, toast } from "../components/Toast"; // Import the new component
 
 export default function Upload() {
   const [dark] = useState(() => {
@@ -36,16 +37,16 @@ export default function Upload() {
   const [title, setTitle] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  // Removed 'status' state variable
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
     if (file.size > 20 * 1024 * 1024) {
-      alert(`File ${file.name} exceeds the 20MB limit.`);
+      toast.error(`File ${file.name} exceeds the 20MB limit.`); // Use toast
       return;
     }
     setSelectedFile(file);
-    setStatus(null);
+    // setStatus(null); // Removed
     
     // Auto-fill title if empty
     if (!title) {
@@ -77,27 +78,27 @@ export default function Upload() {
 
   const handleUploadClick = async () => {
     if (!selectedFile) {
-        setStatus({ type: 'error', message: "Please select a file first." });
+        toast.error("Please select a file first."); // Use toast
         return;
     }
     if (!title.trim()) {
-        setStatus({ type: 'error', message: "Please enter a document title." });
+        toast.error("Please enter a document title."); // Use toast
         return;
     }
 
     setIsUploading(true);
-    setStatus(null);
+    // setStatus(null); // Removed
 
     try {
       // Call the updated API with both file and title
       await uploadFile(selectedFile, title);
       
-      setStatus({ type: 'success', message: "Document uploaded successfully" });
+      toast.success("Document uploaded successfully"); // Use toast
       setSelectedFile(null);
       setTitle("");
     } catch (error: any) {
       console.error("Network error during upload:", error);
-      setStatus({ type: 'error', message: "Failed to upload document. Please try again." });
+      toast.error("Failed to upload document."); // Use toast
     } finally {
       setIsUploading(false);
     }
@@ -111,6 +112,9 @@ export default function Upload() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"
       }
     >
+      {/* Add the ToastProvider here, passing the dark mode state */}
+      <ToastProvider dark={dark} />
+
       <button
         onClick={() => navigate("/")}
         className="absolute top-6 left-6 flex items-center gap-2 text-sm font-medium opacity-70 hover:opacity-100 transition-opacity"
@@ -197,23 +201,7 @@ export default function Upload() {
             />
         </div>
 
-        <AnimatePresence>
-            {status && (
-                <motion.div 
-                    initial={{ opacity: 0, y: -10 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    exit={{ opacity: 0 }}
-                    className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${
-                        status.type === 'success' 
-                            ? "bg-green-500/10 text-green-500 border border-green-500/20" 
-                            : "bg-red-500/10 text-red-500 border border-red-500/20"
-                    }`}
-                >
-                    {status.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                    <span className="font-medium">{status.message}</span>
-                </motion.div>
-            )}
-        </AnimatePresence>
+        {/* Removed AnimatePresence block for status messages */}
 
         <div className="mt-6 flex justify-center">
             <button
