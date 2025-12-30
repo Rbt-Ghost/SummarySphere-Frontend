@@ -46,6 +46,7 @@ export default function Dashboard() {
 
       <CTAButton 
         dark={dark}
+        size="large"
         onClick={() => window.location.href = "/upload"}
       >
         Let's get started

@@ -14,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
+import CTAButton from "../components/CTAbutton"; // Import CTAButton
 
 interface Doc {
   id: string;
@@ -42,14 +43,13 @@ export default function Documents() {
     try {
       if (dark) {
         document.documentElement.classList.add("dark");
-        document.body.style.backgroundColor = "#0f172a"; // bg-slate-900
+        document.body.style.backgroundColor = "#0f172a"; // dark mode bg color
       } else {
         document.documentElement.classList.remove("dark");
-        document.body.style.backgroundColor = "#f4f4f5"; // bg-zinc-200
+        document.body.style.backgroundColor = "#f4f4f5"; // light mode bg color
       }
     } catch { /* ignore */ }
-    return () => { document.body.style.backgroundColor = "";  
-    }; 
+    return () => { document.body.style.backgroundColor = ""; };
   }, [dark]);
 
   const navigate = useNavigate();
@@ -62,7 +62,6 @@ export default function Documents() {
         const response = await fetch("/api/documents");
         if (response.ok) {
           const apiDocs = await response.json();
-          // Reverse the array to show newest documents first
           setDocuments(apiDocs.reverse());
         }
       } catch (error) {
@@ -121,15 +120,15 @@ export default function Documents() {
           <ArrowLeft className="w-4 h-4" />
           Dashboard
         </button>
-        <button
-          onClick={() => navigate("/upload")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            dark ? "bg-blue-600 hover:bg-blue-500 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
-          }`}
+        
+        <CTAButton 
+            dark={dark} 
+            size="small"
+            onClick={() => navigate("/upload")}
         >
           <Plus className="w-4 h-4" />
           Upload New
-        </button>
+        </CTAButton>
       </div>
 
       <motion.div
