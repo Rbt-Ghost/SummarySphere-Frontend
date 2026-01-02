@@ -4,17 +4,19 @@ import {
   FileText, 
   ArrowLeft, 
   Trash2,
-  PlayCircle, 
   Download, 
   CheckCircle2, 
   Clock, 
   Loader2,
-  Plus
+  Plus,
+  Sparkles,
+  Eye
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; // Import CTAButton
+import { summarizeDocument, viewSummary } from "../api"; // UPDATED
 
 interface Doc {
   id: string;
@@ -93,15 +95,24 @@ export default function Documents() {
     window.open(`/api/documents/${id}/file`, "_blank");
   };
 
-  const handleSummarize = (id: string) => {
-    setDocuments((prev) =>
-      prev.map((doc) => (doc.id === id ? { ...doc, status: "processing" } : doc))
-    );
-    setTimeout(() => {
-        setDocuments((prev) =>
-            prev.map((doc) => (doc.id === id ? { ...doc, status: "completed" } : doc))
-        );
-    }, 2000);
+  const handleSummarize = async (id: string) => {
+    // optimistic UI: mark as PROCESSING, but do not fake completion
+    setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PROCESSING" } : doc)));
+
+    try {
+      await summarizeDocument(id);
+
+      // refresh list so status becomes whatever the server reports (PENDING/PROCESSING/COMPLETED/etc.)
+      const response = await fetch("/api/documents");
+      if (response.ok) {
+        const apiDocs = await response.json();
+        setDocuments(apiDocs.reverse());
+      }
+    } catch (error) {
+      // revert optimistic update on failure
+      setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
+      alert(error instanceof Error ? error.message : "Failed to summarize document");
+    }
   };
 
   return (
@@ -201,6 +212,32 @@ export default function Documents() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {/* NEW: Summarize / View Summary BEFORE Download */}
+                            {doc.status === "COMPLETED" ? (
+                                <button
+                                    onClick={() => viewSummary(doc.id)}
+                                    title="View Summary"
+                                    className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                                >
+                                    <Eye className="w-4 h-4" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleSummarize(doc.id)}
+                                    title="Summarize"
+                                    disabled={doc.status === "PROCESSING"}
+                                    className={`
+                                        p-2 rounded-lg transition-colors
+                                        ${doc.status === "PROCESSING"
+                                            ? 'opacity-50 cursor-not-allowed'
+                                            : (dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100')
+                                        }
+                                    `}
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                </button>
+                            )}
+
                             <button 
                                 onClick={() => handleDownload(doc.id)}
                                 title="Download"
@@ -208,19 +245,6 @@ export default function Documents() {
                             >
                                 <Download className="w-4 h-4" />
                             </button>
-
-                            {(!doc.status || doc.status === 'PENDING') && (
-                                <button
-                                    onClick={() => handleSummarize(doc.id)}
-                                    className={`
-                                        flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-                                        ${dark ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}
-                                    `}
-                                >
-                                    <PlayCircle className="w-3 h-3" />
-                                    Summarize
-                                </button>
-                            )}
 
                             <div className={`w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
 

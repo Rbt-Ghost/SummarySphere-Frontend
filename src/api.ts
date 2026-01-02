@@ -38,3 +38,17 @@ export const deleteDocument = async (id: string) => {
 export const downloadDocument = (id: string) => {
   window.open(`${BASE_URL}/${id}/file`, "_blank");
 };
+
+// NEW: open summary in a new tab (adjust endpoint if your backend differs)
+export const viewSummary = (id: string) => {
+  window.open(`${BASE_URL}/${id}/summary`, "_blank");
+};
+
+// NEW: real summarize call (adjust endpoint if your backend differs)
+export const summarizeDocument = async (id: string) => {
+  const response = await fetch(`${BASE_URL}/${id}/summarize`, { method: "POST" });
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(errorText || "Failed to summarize document");
+  }
+};
