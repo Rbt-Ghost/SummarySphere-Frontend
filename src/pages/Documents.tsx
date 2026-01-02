@@ -15,8 +15,8 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
-import CTAButton from "../components/CTAbutton"; // Import CTAButton
-import { summarizeDocument, viewSummary } from "../api"; // UPDATED
+import CTAButton from "../components/CTAbutton"; 
+import { summarizeDocument, viewSummary } from "../api"; 
 
 interface Doc {
   id: string;
@@ -100,7 +100,8 @@ export default function Documents() {
     setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PROCESSING" } : doc)));
 
     try {
-      await summarizeDocument(id);
+      // UPDATED: Pass the summary type explicitly
+      await summarizeDocument(id, "general");
 
       // refresh list so status becomes whatever the server reports (PENDING/PROCESSING/COMPLETED/etc.)
       const response = await fetch("/api/documents");

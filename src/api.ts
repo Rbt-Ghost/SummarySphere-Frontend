@@ -44,9 +44,16 @@ export const viewSummary = (id: string) => {
   window.open(`${BASE_URL}/${id}/summary`, "_blank");
 };
 
-// NEW: real summarize call (adjust endpoint if your backend differs)
-export const summarizeDocument = async (id: string) => {
-  const response = await fetch(`${BASE_URL}/${id}/summarize`, { method: "POST" });
+// UPDATED: Now accepts summaryType and sends a JSON body
+export const summarizeDocument = async (id: string, summaryType: string = "general") => {
+  const response = await fetch(`${BASE_URL}/${id}/summarize`, { 
+    method: "POST", 
+    headers: {
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ summaryType }) 
+  });
+  
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
     throw new Error(errorText || "Failed to summarize document");
