@@ -11,13 +11,14 @@ import {
   Plus,
   Sparkles,
   Eye,
-  X // Import X icon for the modal
+  X 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
-import { summarizeDocument } from "../api"; 
+// UPDATED: Import downloadDocument
+import { summarizeDocument, downloadDocument } from "../api"; 
 
 interface Doc {
   id: string;
@@ -58,8 +59,6 @@ export default function Documents() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
-
-  // State for the Summary Modal
   const [selectedSummary, setSelectedSummary] = useState<{title: string, content: string} | null>(null);
 
   useEffect(() => {
@@ -88,7 +87,6 @@ export default function Documents() {
         });
         if (response.ok) {
           setDocuments((prev) => prev.filter((doc) => doc.id !== id));
-          // Clean up local storage
           localStorage.removeItem(`summary-${id}`);
         }
       } catch (error) {
@@ -97,22 +95,41 @@ export default function Documents() {
     }
   };
 
-  const handleDownload = (id: string) => {
-    window.open(`/api/documents/${id}/file`, "_blank");
+  // UPDATED: Logic to use user Title + Original Extension
+  const handleDownload = async (doc: Doc) => {
+    try {
+        let filename = doc.fileName; // Default to original filename (e.g., report.pdf)
+
+        // If user provided a title, try to use it
+        if (doc.title && doc.title.trim() !== "") {
+            const originalExt = doc.fileName.includes('.') 
+                ? '.' + doc.fileName.split('.').pop() 
+                : '';
+            
+            // If the title doesn't already have the extension, append it
+            if (originalExt && !doc.title.endsWith(originalExt)) {
+                filename = doc.title + originalExt;
+            } else {
+                filename = doc.title;
+            }
+        }
+
+        await downloadDocument(doc.id, filename);
+    } catch (error) {
+        console.error("Download error:", error);
+        alert("Failed to download document.");
+    }
   };
 
   const handleSummarize = async (id: string) => {
     setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PROCESSING" } : doc)));
 
     try {
-      // 1. Get the response which contains { message: "The Summary Text...", documentId: "..." }
       const data = await summarizeDocument(id, "general");
 
-      // 2. Save the summary to LocalStorage so we can view it later without a backend endpoint
       if (data && data.message) {
         localStorage.setItem(`summary-${id}`, data.message);
         
-        // Optionally show it immediately
         const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
         setSelectedSummary({ title: `Summary: ${docTitle}`, content: data.message });
       }
@@ -128,7 +145,6 @@ export default function Documents() {
     }
   };
 
-  // New function to handle viewing summary from LocalStorage
   const handleViewSummary = (id: string) => {
     const summaryText = localStorage.getItem(`summary-${id}`);
     const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
@@ -136,9 +152,7 @@ export default function Documents() {
     if (summaryText) {
       setSelectedSummary({ title: `Summary: ${docTitle}`, content: summaryText });
     } else {
-      // Fallback if the user cleared cache or is on a new device, but server says COMPLETED
       alert("Summary content not found on this device. Please summarize the document again.");
-      // Optional: You could trigger handleSummarize(id) here automatically if you prefer
     }
   };
 
@@ -169,7 +183,6 @@ export default function Documents() {
         </CTAButton>
       </div>
 
-      {/* SUMMARY MODAL */}
       <AnimatePresence>
         {selectedSummary && (
           <motion.div 
@@ -281,7 +294,6 @@ export default function Documents() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {/* UPDATED: Handle View Summary using LocalStorage */}
                             {doc.status === "COMPLETED" ? (
                                 <button
                                     onClick={() => handleViewSummary(doc.id)}
@@ -307,8 +319,9 @@ export default function Documents() {
                                 </button>
                             )}
 
+                            {/* UPDATED: Pass the whole doc object to handleDownload */}
                             <button 
-                                onClick={() => handleDownload(doc.id)}
+                                onClick={() => handleDownload(doc)}
                                 title="Download"
                                 className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
                             >

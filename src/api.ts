@@ -1,3 +1,4 @@
+// src/api.ts
 const BASE_URL = "/api/documents"; 
 
 export const uploadFile = async (file: File, title: string) => {
@@ -29,8 +30,30 @@ export const deleteDocument = async (id: string) => {
   if (!response.ok) throw new Error("Failed to delete document");
 };
 
-export const downloadDocument = (id: string) => {
-  window.open(`${BASE_URL}/${id}/file`, "_blank");
+// UPDATED: Now fetches the blob and downloads it with a custom filename
+export const downloadDocument = async (id: string, filename: string) => {
+  const response = await fetch(`${BASE_URL}/${id}/file`);
+  
+  if (!response.ok) {
+      throw new Error("Failed to download file");
+  }
+
+  // Create a blob from the response
+  const blob = await response.blob();
+  
+  // Create a temporary link element
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename; // Set the desired filename here
+  
+  // Trigger the click
+  document.body.appendChild(a);
+  a.click();
+  
+  // Cleanup
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 };
 
 export const summarizeDocument = async (id: string, summaryType: string = "general") => {
