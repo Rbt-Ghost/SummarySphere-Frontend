@@ -10,13 +10,14 @@ import {
   Loader2,
   Plus,
   Sparkles,
-  Eye
+  Eye,
+  X // Import X icon for the modal
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
-import { summarizeDocument, viewSummary } from "../api"; 
+import { summarizeDocument } from "../api"; 
 
 interface Doc {
   id: string;
@@ -45,10 +46,10 @@ export default function Documents() {
     try {
       if (dark) {
         document.documentElement.classList.add("dark");
-        document.body.style.backgroundColor = "#0f172a"; // dark mode bg color
+        document.body.style.backgroundColor = "#0f172a"; 
       } else {
         document.documentElement.classList.remove("dark");
-        document.body.style.backgroundColor = "#f4f4f5"; // light mode bg color
+        document.body.style.backgroundColor = "#f4f4f5"; 
       }
     } catch { /* ignore */ }
     return () => { document.body.style.backgroundColor = ""; };
@@ -57,6 +58,9 @@ export default function Documents() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
+
+  // State for the Summary Modal
+  const [selectedSummary, setSelectedSummary] = useState<{title: string, content: string} | null>(null);
 
   useEffect(() => {
     const fetchDocs = async () => {
@@ -84,6 +88,8 @@ export default function Documents() {
         });
         if (response.ok) {
           setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+          // Clean up local storage
+          localStorage.removeItem(`summary-${id}`);
         }
       } catch (error) {
         alert("Error deleting document");
@@ -96,23 +102,43 @@ export default function Documents() {
   };
 
   const handleSummarize = async (id: string) => {
-    // optimistic UI: mark as PROCESSING, but do not fake completion
     setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PROCESSING" } : doc)));
 
     try {
-      // UPDATED: Pass the summary type explicitly
-      await summarizeDocument(id, "general");
+      // 1. Get the response which contains { message: "The Summary Text...", documentId: "..." }
+      const data = await summarizeDocument(id, "general");
 
-      // refresh list so status becomes whatever the server reports (PENDING/PROCESSING/COMPLETED/etc.)
+      // 2. Save the summary to LocalStorage so we can view it later without a backend endpoint
+      if (data && data.message) {
+        localStorage.setItem(`summary-${id}`, data.message);
+        
+        // Optionally show it immediately
+        const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
+        setSelectedSummary({ title: `Summary: ${docTitle}`, content: data.message });
+      }
+
       const response = await fetch("/api/documents");
       if (response.ok) {
         const apiDocs = await response.json();
         setDocuments(apiDocs.reverse());
       }
     } catch (error) {
-      // revert optimistic update on failure
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
       alert(error instanceof Error ? error.message : "Failed to summarize document");
+    }
+  };
+
+  // New function to handle viewing summary from LocalStorage
+  const handleViewSummary = (id: string) => {
+    const summaryText = localStorage.getItem(`summary-${id}`);
+    const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
+
+    if (summaryText) {
+      setSelectedSummary({ title: `Summary: ${docTitle}`, content: summaryText });
+    } else {
+      // Fallback if the user cleared cache or is on a new device, but server says COMPLETED
+      alert("Summary content not found on this device. Please summarize the document again.");
+      // Optional: You could trigger handleSummarize(id) here automatically if you prefer
     }
   };
 
@@ -142,6 +168,48 @@ export default function Documents() {
           Upload New
         </CTAButton>
       </div>
+
+      {/* SUMMARY MODAL */}
+      <AnimatePresence>
+        {selectedSummary && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedSummary(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl p-6 ${dark ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}
+            >
+              <button 
+                onClick={() => setSelectedSummary(null)}
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <h3 className="text-xl font-bold mb-4 pr-8">{selectedSummary.title}</h3>
+              <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed opacity-90">
+                {selectedSummary.content}
+              </div>
+              
+              <div className="mt-8 flex justify-end">
+                <button
+                    onClick={() => setSelectedSummary(null)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${dark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-zinc-100 hover:bg-zinc-200'}`}
+                >
+                    Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -213,10 +281,10 @@ export default function Documents() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {/* NEW: Summarize / View Summary BEFORE Download */}
+                            {/* UPDATED: Handle View Summary using LocalStorage */}
                             {doc.status === "COMPLETED" ? (
                                 <button
-                                    onClick={() => viewSummary(doc.id)}
+                                    onClick={() => handleViewSummary(doc.id)}
                                     title="View Summary"
                                     className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
                                 >
