@@ -18,6 +18,8 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
 import { summarizeDocument, downloadDocument } from "../api"; 
+// UPDATED: Import Toast
+import { toast, ToastProvider } from "../components/Toast";
 
 interface Doc {
   id: string;
@@ -87,9 +89,10 @@ export default function Documents() {
         if (response.ok) {
           setDocuments((prev) => prev.filter((doc) => doc.id !== id));
           localStorage.removeItem(`summary-${id}`);
+          toast.success("Document deleted successfully");
         }
       } catch (error) {
-        alert("Error deleting document");
+        toast.error("Error deleting document");
       }
     }
   };
@@ -113,7 +116,7 @@ export default function Documents() {
         await downloadDocument(doc.id, filename);
     } catch (error) {
         console.error("Download error:", error);
-        alert("Failed to download document.");
+        toast.error("Failed to download document.");
     }
   };
 
@@ -128,6 +131,7 @@ export default function Documents() {
         
         const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
         setSelectedSummary({ title: `Summary: ${docTitle}`, content: data.message });
+        toast.success("Summary generated successfully!");
       }
 
       const response = await fetch("/api/documents");
@@ -137,7 +141,8 @@ export default function Documents() {
       }
     } catch (error) {
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
-      alert(error instanceof Error ? error.message : "Failed to summarize document");
+      // UPDATED: Use toast instead of alert
+      toast.error(error instanceof Error ? error.message : "Failed to summarize document");
     }
   };
 
@@ -148,7 +153,7 @@ export default function Documents() {
     if (summaryText) {
       setSelectedSummary({ title: `Summary: ${docTitle}`, content: summaryText });
     } else {
-      alert("Summary content not found on this device. Please summarize the document again.");
+      toast.error("Summary content not found. Please summarize again.");
     }
   };
 
@@ -160,6 +165,9 @@ export default function Documents() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"
       }
     >
+      {/* UPDATED: Added ToastProvider */}
+      <ToastProvider dark={dark} />
+
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <button
           onClick={() => navigate("/")}

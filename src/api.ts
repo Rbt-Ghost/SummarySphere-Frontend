@@ -1,6 +1,30 @@
 // src/api.ts
 const BASE_URL = "/api/documents"; 
 
+// Helper to extract a clean error message from the response
+const throwError = async (response: Response, defaultMsg: string) => {
+    let errorMsg = defaultMsg;
+    const text = await response.text().catch(() => "");
+    
+    if (text) {
+        try {
+            // Try to parse as JSON (handles 500 Spring Boot errors)
+            const json = JSON.parse(text);
+            if (json.status === 500) {
+                errorMsg = "Error. Please try again later.";
+            } else if (json.message) {
+                errorMsg = json.message;
+            } else if (json.error) {
+                 errorMsg = json.error;
+            }
+        } catch {
+            // If not JSON, use the plain text response (handles 400 Controller messages)
+            errorMsg = text;
+        }
+    }
+    throw new Error(errorMsg);
+}
+
 export const uploadFile = async (file: File, title: string) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -12,8 +36,7 @@ export const uploadFile = async (file: File, title: string) => {
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `Upload failed: ${response.statusText}`);
+        await throwError(response, `Upload failed: ${response.statusText}`);
     }
 
     return response.text();
@@ -21,27 +44,26 @@ export const uploadFile = async (file: File, title: string) => {
 
 export const fetchDocuments = async () => {
   const response = await fetch(BASE_URL);
-  if (!response.ok) throw new Error("Failed to fetch documents");
+  if (!response.ok) await throwError(response, "Failed to fetch documents");
   return response.json();
 };
 
-// NEW: Fetch single document metadata
 export const fetchDocumentById = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`);
-  if (!response.ok) throw new Error("Failed to fetch document details");
+  if (!response.ok) await throwError(response, "Failed to fetch document details");
   return response.json();
 };
 
 export const deleteDocument = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
-  if (!response.ok) throw new Error("Failed to delete document");
+  if (!response.ok) await throwError(response, "Failed to delete document");
 };
 
 export const downloadDocument = async (id: string, filename: string) => {
   const response = await fetch(`${BASE_URL}/${id}/file`);
   
   if (!response.ok) {
-      throw new Error("Failed to download file");
+      await throwError(response, "Failed to download file");
   }
 
   const blob = await response.blob();
@@ -65,8 +87,7 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
   });
   
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    throw new Error(errorText || "Failed to summarize document");
+    await throwError(response, "Failed to summarize document");
   }
 
   return response.json();
