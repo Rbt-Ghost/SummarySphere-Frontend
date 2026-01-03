@@ -41,7 +41,7 @@ export default function Upload() {
   const handleFileChange = (file: File | null) => {
     if (!file) return;
     if (file.size > 20 * 1024 * 1024) {
-      toast.error(`File ${file.name} exceeds the 20MB limit.`); // Use toast
+      toast.error(`File ${file.name} exceeds the 20MB limit.`); 
       return;
     }
     setSelectedFile(file);
@@ -74,12 +74,13 @@ export default function Upload() {
   };
 
   const handleUploadClick = async () => {
+    // Validation checks - these will now trigger if the button is clicked empty
     if (!selectedFile) {
-        toast.error("Please select a file first."); // Use toast
+        toast.error("Please select a file first."); 
         return;
     }
     if (!title.trim()) {
-        toast.error("Please enter a document title."); // Use toast
+        toast.error("Please enter a document title."); 
         return;
     }
 
@@ -88,12 +89,12 @@ export default function Upload() {
     try {
       await uploadFile(selectedFile, title);
       
-      toast.success("Document uploaded successfully"); // Use toast
+      toast.success("Document uploaded successfully"); 
       setSelectedFile(null);
       setTitle("");
     } catch (error: any) {
       console.error("Network error during upload:", error);
-      toast.error("Failed to upload document."); // Use toast
+      toast.error("Failed to upload document."); 
     } finally {
       setIsUploading(false);
     }
@@ -107,7 +108,6 @@ export default function Upload() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"
       }
     >
-      {/* Add the ToastProvider here, passing the dark mode state */}
       <ToastProvider dark={dark} />
 
       <button
@@ -196,16 +196,15 @@ export default function Upload() {
             />
         </div>
 
-        {/* Removed AnimatePresence block for status messages */}
-
         <div className="mt-6 flex justify-center">
+            {/* UPDATED: Removed check for !selectedFile so button is always enabled unless uploading */}
             <button
                 onClick={handleUploadClick}
-                disabled={isUploading || !selectedFile}
+                disabled={isUploading} 
                 className={`
                     w-full py-3.5 rounded-xl font-bold text-lg shadow-lg transition-all flex justify-center items-center gap-2
                     ${dark ? "bg-white text-black hover:bg-gray-200" : "bg-black text-white hover:bg-gray-800"}
-                    ${(isUploading || !selectedFile) ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.02]"}
+                    ${isUploading ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.02]"}
                 `}
             >
                 {isUploading ? "Uploading..." : "Upload Document"}
@@ -214,7 +213,6 @@ export default function Upload() {
 
       </motion.div>
 
-      {/* Add "View documents list" at the bottom (like Dashboard) */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
