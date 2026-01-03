@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion"; // AnimatePresence is no longer needed for the toast
-import { UploadCloud, FileText, ArrowLeft, X } from "lucide-react"; // Removed CheckCircle, AlertCircle
+import { motion } from "framer-motion";
+import { UploadCloud, FileText, ArrowLeft, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { uploadFile } from "../api";
 
 import Footer from "../components/Footer";
-import { ToastProvider, toast } from "../components/Toast"; // Import the new component
+import { ToastProvider, toast } from "../components/Toast";
 
 export default function Upload() {
   const [dark] = useState(() => {
@@ -37,7 +37,6 @@ export default function Upload() {
   const [title, setTitle] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  // Removed 'status' state variable
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
@@ -46,9 +45,7 @@ export default function Upload() {
       return;
     }
     setSelectedFile(file);
-    // setStatus(null); // Removed
-    
-    // Auto-fill title if empty
+
     if (!title) {
         setTitle(file.name.split('.')[0]);
     }
@@ -87,10 +84,8 @@ export default function Upload() {
     }
 
     setIsUploading(true);
-    // setStatus(null); // Removed
 
     try {
-      // Call the updated API with both file and title
       await uploadFile(selectedFile, title);
       
       toast.success("Document uploaded successfully"); // Use toast
@@ -218,7 +213,23 @@ export default function Upload() {
         </div>
 
       </motion.div>
-      
+
+      {/* Add "View documents list" at the bottom (like Dashboard) */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="mt-3"
+      >
+        <button
+          type="button"
+          onClick={() => navigate("/documents")}
+          className="text-sm underline opacity-70 hover:opacity-100 transition-opacity"
+        >
+          View documents list
+        </button>
+      </motion.div>
+
       <Footer dark={dark} />
     </div>
   );
