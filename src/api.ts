@@ -25,12 +25,18 @@ export const fetchDocuments = async () => {
   return response.json();
 };
 
+// NEW: Fetch single document metadata
+export const fetchDocumentById = async (id: string) => {
+  const response = await fetch(`${BASE_URL}/${id}`);
+  if (!response.ok) throw new Error("Failed to fetch document details");
+  return response.json();
+};
+
 export const deleteDocument = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
   if (!response.ok) throw new Error("Failed to delete document");
 };
 
-// UPDATED: Now fetches the blob and downloads it with a custom filename
 export const downloadDocument = async (id: string, filename: string) => {
   const response = await fetch(`${BASE_URL}/${id}/file`);
   
@@ -38,20 +44,13 @@ export const downloadDocument = async (id: string, filename: string) => {
       throw new Error("Failed to download file");
   }
 
-  // Create a blob from the response
   const blob = await response.blob();
-  
-  // Create a temporary link element
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename; // Set the desired filename here
-  
-  // Trigger the click
+  a.download = filename; 
   document.body.appendChild(a);
   a.click();
-  
-  // Cleanup
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 };

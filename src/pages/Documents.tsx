@@ -11,13 +11,12 @@ import {
   Plus,
   Sparkles,
   Eye,
-  X 
+  X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
-// UPDATED: Import downloadDocument
 import { summarizeDocument, downloadDocument } from "../api"; 
 
 interface Doc {
@@ -95,18 +94,15 @@ export default function Documents() {
     }
   };
 
-  // UPDATED: Logic to use user Title + Original Extension
   const handleDownload = async (doc: Doc) => {
     try {
-        let filename = doc.fileName; // Default to original filename (e.g., report.pdf)
+        let filename = doc.fileName; 
 
-        // If user provided a title, try to use it
         if (doc.title && doc.title.trim() !== "") {
             const originalExt = doc.fileName.includes('.') 
                 ? '.' + doc.fileName.split('.').pop() 
                 : '';
             
-            // If the title doesn't already have the extension, append it
             if (originalExt && !doc.title.endsWith(originalExt)) {
                 filename = doc.title + originalExt;
             } else {
@@ -266,7 +262,12 @@ export default function Documents() {
                             <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                            <h3 className="font-semibold truncate max-w-[200px] sm:max-w-xs" title={doc.title || doc.fileName}>
+                            {/* UPDATED: Clickable Title */}
+                            <h3 
+                                onClick={() => navigate(`/documents/${doc.id}`)}
+                                className="font-semibold truncate max-w-[200px] sm:max-w-xs cursor-pointer hover:text-blue-500 hover:underline transition-colors" 
+                                title="Click to view details"
+                            >
                                 {doc.title || doc.fileName}
                             </h3>
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
@@ -290,7 +291,8 @@ export default function Documents() {
                             {doc.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
                             {doc.status === 'PROCESSING' && <Loader2 className="w-3 h-3 animate-spin" />}
                             {(doc.status === 'PENDING' || !doc.status) && <Clock className="w-3 h-3" />}
-                            <span className="capitalize">{doc.status || 'Pending'}</span>
+                            {/* UPDATED: Display SUMMARIZED instead of Completed */}
+                            <span className="capitalize">{doc.status === 'COMPLETED' ? 'SUMMARIZED' : (doc.status || 'Pending')}</span>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -319,7 +321,6 @@ export default function Documents() {
                                 </button>
                             )}
 
-                            {/* UPDATED: Pass the whole doc object to handleDownload */}
                             <button 
                                 onClick={() => handleDownload(doc)}
                                 title="Download"
