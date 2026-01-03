@@ -12,6 +12,7 @@ import {
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
 import { fetchDocumentById, summarizeDocument, downloadDocument } from "../api";
+import { toast, ToastProvider } from "../components/Toast";
 
 interface DocDetail {
   id: string;
@@ -19,7 +20,6 @@ interface DocDetail {
   fileType: string;
   status: string;
   uploadedAt: string;
-  // Title might not be in the DTO based on backend code, but handling it just in case
   title?: string;
 }
 
@@ -33,7 +33,6 @@ export default function DocumentDetail() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Dark mode logic reused from other pages
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
       try {
@@ -64,7 +63,6 @@ export default function DocumentDetail() {
         const doc = await fetchDocumentById(id);
         setDocumentMeta(doc);
         
-        // Try to load existing summary from localStorage since backend doesn't have GET /summary
         const savedSummary = localStorage.getItem(`summary-${id}`);
         if (savedSummary) {
           setSummary(savedSummary);
@@ -85,19 +83,24 @@ export default function DocumentDetail() {
     
     setIsSummarizing(true);
     try {
-      // Optimistic update
       setDocumentMeta({ ...documentMeta, status: "PROCESSING" });
       
-      const data = await summarizeDocument(id, "general");
+      // FIXED: Backend throws 500 if we request the same type twice.
+      // We append a timestamp to the type to ensure uniqueness (e.g. "general (v1709...)")
+      const summaryType = summary ? `general (v${Date.now()})` : "general";
+      
+      const data = await summarizeDocument(id, summaryType);
       
       if (data && data.message) {
         localStorage.setItem(`summary-${id}`, data.message);
         setSummary(data.message);
         setDocumentMeta({ ...documentMeta, status: "COMPLETED" });
+        toast.success("Summary generated successfully!"); 
       }
     } catch (err) {
-      alert("Failed to generate summary. Please try again.");
-      setDocumentMeta({ ...documentMeta, status: "PENDING" }); // Revert on fail
+      toast.error("Failed to generate summary. Please try again.");
+      console.error(err);
+      setDocumentMeta({ ...documentMeta, status: "PENDING" }); 
     } finally {
       setIsSummarizing(false);
     }
@@ -108,7 +111,7 @@ export default function DocumentDetail() {
     try {
         await downloadDocument(documentMeta.id, documentMeta.fileName);
     } catch (e) {
-        alert("Download failed");
+        toast.error("Download failed");
     }
   };
 
@@ -133,6 +136,8 @@ export default function DocumentDetail() {
   return (
     <div className={dark ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24 relative pb-20" : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"}>
       
+      <ToastProvider dark={dark} />
+
       {/* Navigation Header */}
       <div className="w-full max-w-5xl flex justify-between items-center mb-8">
         <button
@@ -173,7 +178,6 @@ export default function DocumentDetail() {
               </div>
               <div className="flex items-center justify-between text-sm">
                  <span className="opacity-60">Status</span>
-                 {/* UPDATED: Displays "SUMMARIZED" when status is "COMPLETED" */}
                  <span className={`px-2 py-0.5 rounded text-xs font-medium 
                     ${documentMeta.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500' : 
                       documentMeta.status === 'PROCESSING' ? 'bg-blue-500/10 text-blue-500' : 
