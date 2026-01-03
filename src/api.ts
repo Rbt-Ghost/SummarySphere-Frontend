@@ -1,14 +1,11 @@
-// src/api.ts
 const BASE_URL = "/api/documents"; 
 
-// Helper to extract a clean error message from the response
 const throwError = async (response: Response, defaultMsg: string) => {
     let errorMsg = defaultMsg;
     const text = await response.text().catch(() => "");
     
     if (text) {
         try {
-            // Try to parse as JSON (handles 500 Spring Boot errors)
             const json = JSON.parse(text);
             if (json.status === 500) {
                 errorMsg = "Error. Please try again later.";
@@ -18,7 +15,6 @@ const throwError = async (response: Response, defaultMsg: string) => {
                  errorMsg = json.error;
             }
         } catch {
-            // If not JSON, use the plain text response (handles 400 Controller messages)
             errorMsg = text;
         }
     }
