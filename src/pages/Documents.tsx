@@ -11,13 +11,14 @@ import {
   Plus,
   Sparkles,
   Eye,
-  X
+  X,
+  AlertTriangle 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
-import { summarizeDocument, downloadDocument } from "../api"; 
+import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument } from "../api"; 
 import { toast, ToastProvider } from "../components/Toast";
 
 interface Doc {
@@ -59,46 +60,56 @@ export default function Documents() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
+  
+  // Modals state
   const [selectedSummary, setSelectedSummary] = useState<{title: string, content: string} | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Helper to load documents
+  const loadDocs = async () => {
+    try {
+      const apiDocs = await fetchDocuments();
+      setDocuments(apiDocs.reverse());
+    } catch (error) {
+      console.error("Failed to fetch documents:", error);
+      toast.error("Failed to load documents");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDocs = async () => {
-      try {
-        const response = await fetch("/api/documents");
-        if (response.ok) {
-          const apiDocs = await response.json();
-          setDocuments(apiDocs.reverse());
-        }
-      } catch (error) {
-        console.error("Failed to fetch documents:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDocs();
+    loadDocs();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if(confirm("Are you sure you want to delete this document?")) {
-      try {
-        const response = await fetch(`/api/documents/${id}`, {
-          method: "DELETE",
-        });
-        if (response.ok) {
-          setDocuments((prev) => prev.filter((doc) => doc.id !== id));
-          localStorage.removeItem(`summary-${id}`);
-          toast.success("Document deleted successfully");
-        }
-      } catch (error) {
-        toast.error("Error deleting document");
-      }
+  // Open the proper confirmation modal
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id);
+  };
+
+  // Perform the delete action
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    
+    try {
+      await deleteDocument(deleteId);
+      
+      // Optimistically remove from UI
+      setDocuments((prev) => prev.filter((doc) => doc.id !== deleteId));
+      localStorage.removeItem(`summary-${deleteId}`);
+      toast.success("Document deleted successfully");
+    } catch (error) {
+      // If delete fails, force refresh the list from server to ensure UI sync
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Error deleting document");
+      await loadDocs(); 
+    } finally {
+      setDeleteId(null);
     }
   };
 
   const handleDownload = async (doc: Doc) => {
     try {
-        // UPDATED: Always use the original fileName
         await downloadDocument(doc.id, doc.fileName);
     } catch (error) {
         console.error("Download error:", error);
@@ -120,11 +131,8 @@ export default function Documents() {
         toast.success("Summary generated successfully!");
       }
 
-      const response = await fetch("/api/documents");
-      if (response.ok) {
-        const apiDocs = await response.json();
-        setDocuments(apiDocs.reverse());
-      }
+      await loadDocs(); // Refresh to get updated status
+
     } catch (error) {
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
       toast.error(error instanceof Error ? error.message : "Failed to summarize document");
@@ -172,6 +180,7 @@ export default function Documents() {
       </div>
 
       <AnimatePresence>
+        {/* Summary Modal */}
         {selectedSummary && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -205,6 +214,52 @@ export default function Documents() {
                     className={`px-4 py-2 rounded-lg text-sm font-medium ${dark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-zinc-100 hover:bg-zinc-200'}`}
                 >
                     Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setDeleteId(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md rounded-2xl shadow-2xl p-6 border ${dark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-zinc-200 text-slate-900'}`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`p-3 rounded-full shrink-0 ${dark ? 'bg-red-900/30' : 'bg-red-100'}`}>
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2">Delete Document?</h3>
+                  <p className="opacity-70 text-sm leading-relaxed">
+                    Are you sure you want to delete this document? This action cannot be undone and the summary will be lost.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-8 flex justify-end gap-3">
+                <button
+                    onClick={() => setDeleteId(null)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={confirmDelete}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all"
+                >
+                    Delete Document
                 </button>
               </div>
             </motion.div>
@@ -322,7 +377,7 @@ export default function Documents() {
                             <div className={`w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
 
                             <button 
-                                onClick={() => handleDelete(doc.id)}
+                                onClick={() => handleDeleteClick(doc.id)}
                                 title="Delete"
                                 className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
                             >

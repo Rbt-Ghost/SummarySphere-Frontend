@@ -5,21 +5,33 @@ const throwError = async (response: Response, defaultMsg: string) => {
     const text = await response.text().catch(() => "");
     
     if (text) {
+        if (text.includes("Quota exceeded") || text.includes("429") || text.includes("Too Many Requests")) {
+            throw new Error("⚠️ AI Usage Limit Reached. Please wait 15 seconds and try again.");
+        }
+
         try {
             const json = JSON.parse(text);
             if (json.status === 500) {
-                errorMsg = "Error. Please try again later.";
+                errorMsg = "Internal Server Error. Please try again later.";
             } else if (json.message) {
                 errorMsg = json.message;
             } else if (json.error) {
                  errorMsg = json.error;
             }
         } catch {
-            errorMsg = text;
+            if (text.length < 200) {
+                errorMsg = text;
+            }
         }
     }
     throw new Error(errorMsg);
 }
+
+const NO_CACHE_HEADERS = {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+};
 
 export const uploadFile = async (file: File, title: string) => {
     const formData = new FormData();
@@ -29,6 +41,7 @@ export const uploadFile = async (file: File, title: string) => {
     const response = await fetch(`${BASE_URL}`, {
         method: "POST",
         body: formData,
+        headers: NO_CACHE_HEADERS
     });
 
     if (!response.ok) {
@@ -39,19 +52,26 @@ export const uploadFile = async (file: File, title: string) => {
 };
 
 export const fetchDocuments = async () => {
-  const response = await fetch(BASE_URL);
+  const response = await fetch(`${BASE_URL}?t=${Date.now()}`, {
+      headers: NO_CACHE_HEADERS
+  });
   if (!response.ok) await throwError(response, "Failed to fetch documents");
   return response.json();
 };
 
 export const fetchDocumentById = async (id: string) => {
-  const response = await fetch(`${BASE_URL}/${id}`);
+  const response = await fetch(`${BASE_URL}/${id}?t=${Date.now()}`, {
+      headers: NO_CACHE_HEADERS
+  });
   if (!response.ok) await throwError(response, "Failed to fetch document details");
   return response.json();
 };
 
 export const deleteDocument = async (id: string) => {
-  const response = await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
+  const response = await fetch(`${BASE_URL}/${id}`, { 
+      method: "DELETE",
+      headers: NO_CACHE_HEADERS
+  });
   if (!response.ok) await throwError(response, "Failed to delete document");
 };
 
@@ -78,6 +98,7 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
     method: "POST", 
     headers: {
         "Content-Type": "application/json",
+        ...NO_CACHE_HEADERS
     },
     body: JSON.stringify({ summaryType }) 
   });
