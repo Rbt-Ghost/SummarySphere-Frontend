@@ -18,7 +18,6 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
 import { summarizeDocument, downloadDocument } from "../api"; 
-// UPDATED: Import Toast
 import { toast, ToastProvider } from "../components/Toast";
 
 interface Doc {
@@ -99,21 +98,8 @@ export default function Documents() {
 
   const handleDownload = async (doc: Doc) => {
     try {
-        let filename = doc.fileName; 
-
-        if (doc.title && doc.title.trim() !== "") {
-            const originalExt = doc.fileName.includes('.') 
-                ? '.' + doc.fileName.split('.').pop() 
-                : '';
-            
-            if (originalExt && !doc.title.endsWith(originalExt)) {
-                filename = doc.title + originalExt;
-            } else {
-                filename = doc.title;
-            }
-        }
-
-        await downloadDocument(doc.id, filename);
+        // UPDATED: Always use the original fileName
+        await downloadDocument(doc.id, doc.fileName);
     } catch (error) {
         console.error("Download error:", error);
         toast.error("Failed to download document.");
@@ -141,7 +127,6 @@ export default function Documents() {
       }
     } catch (error) {
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
-      // UPDATED: Use toast instead of alert
       toast.error(error instanceof Error ? error.message : "Failed to summarize document");
     }
   };
@@ -165,7 +150,6 @@ export default function Documents() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"
       }
     >
-      {/* UPDATED: Added ToastProvider */}
       <ToastProvider dark={dark} />
 
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
@@ -270,7 +254,6 @@ export default function Documents() {
                             <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                            {/* UPDATED: Clickable Title */}
                             <h3 
                                 onClick={() => navigate(`/documents/${doc.id}`)}
                                 className="font-semibold truncate max-w-[200px] sm:max-w-xs cursor-pointer hover:text-blue-500 hover:underline transition-colors" 
@@ -299,7 +282,6 @@ export default function Documents() {
                             {doc.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
                             {doc.status === 'PROCESSING' && <Loader2 className="w-3 h-3 animate-spin" />}
                             {(doc.status === 'PENDING' || !doc.status) && <Clock className="w-3 h-3" />}
-                            {/* UPDATED: Display SUMMARIZED instead of Completed */}
                             <span className="capitalize">{doc.status === 'COMPLETED' ? 'SUMMARIZED' : (doc.status || 'Pending')}</span>
                         </div>
 
