@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
 import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument } from "../api"; 
-import { toast } from "../components/Toast"; // Only import toast trigger, not Provider
+import { toast } from "../components/Toast";
 
 interface Doc {
   id: string;
@@ -60,7 +60,6 @@ export default function Documents() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
-  
   const [selectedSummary, setSelectedSummary] = useState<{title: string, content: string} | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -119,9 +118,6 @@ export default function Documents() {
 
       if (data && data.message) {
         localStorage.setItem(`summary-${id}`, data.message);
-        
-        const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
-        setSelectedSummary({ title: `Summary: ${docTitle}`, content: data.message });
         toast.success("Summary generated successfully!");
       }
 
@@ -135,10 +131,12 @@ export default function Documents() {
 
   const handleViewSummary = (id: string) => {
     const summaryText = localStorage.getItem(`summary-${id}`);
-    const docTitle = documents.find(d => d.id === id)?.fileName || "Document";
+    
+    const doc = documents.find(d => d.id === id);
+    const displayTitle = doc?.title || doc?.fileName || "Document";
 
     if (summaryText) {
-      setSelectedSummary({ title: `Summary: ${docTitle}`, content: summaryText });
+      setSelectedSummary({ title: `Document: ${displayTitle}`, content: summaryText });
     } else {
       toast.error("Summary content not found. Please summarize again.");
     }
@@ -152,7 +150,7 @@ export default function Documents() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"
       }
     >
-      {/* ToastProvider REMOVED from here */}
+      {/* ToastProvider is in App.tsx */}
 
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <button
@@ -174,6 +172,7 @@ export default function Documents() {
       </div>
 
       <AnimatePresence>
+        {/* Summary Modal */}
         {selectedSummary && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -213,6 +212,7 @@ export default function Documents() {
           </motion.div>
         )}
 
+        {/* Delete Confirmation Modal */}
         {deleteId && (
           <motion.div 
             initial={{ opacity: 0 }}
