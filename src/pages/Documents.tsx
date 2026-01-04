@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton"; 
 import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument } from "../api"; 
-import { toast, ToastProvider } from "../components/Toast";
+import { toast } from "../components/Toast"; // Only import toast trigger, not Provider
 
 interface Doc {
   id: string;
@@ -61,11 +61,9 @@ export default function Documents() {
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
   
-  // Modals state
   const [selectedSummary, setSelectedSummary] = useState<{title: string, content: string} | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Helper to load documents
   const loadDocs = async () => {
     try {
       const apiDocs = await fetchDocuments();
@@ -82,24 +80,20 @@ export default function Documents() {
     loadDocs();
   }, []);
 
-  // Open the proper confirmation modal
   const handleDeleteClick = (id: string) => {
     setDeleteId(id);
   };
 
-  // Perform the delete action
   const confirmDelete = async () => {
     if (!deleteId) return;
     
     try {
       await deleteDocument(deleteId);
       
-      // Optimistically remove from UI
       setDocuments((prev) => prev.filter((doc) => doc.id !== deleteId));
       localStorage.removeItem(`summary-${deleteId}`);
       toast.success("Document deleted successfully");
     } catch (error) {
-      // If delete fails, force refresh the list from server to ensure UI sync
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Error deleting document");
       await loadDocs(); 
@@ -131,7 +125,7 @@ export default function Documents() {
         toast.success("Summary generated successfully!");
       }
 
-      await loadDocs(); // Refresh to get updated status
+      await loadDocs(); 
 
     } catch (error) {
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
@@ -158,7 +152,7 @@ export default function Documents() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"
       }
     >
-      <ToastProvider dark={dark} />
+      {/* ToastProvider REMOVED from here */}
 
       <div className="w-full max-w-4xl flex justify-between items-center mb-8">
         <button
@@ -180,7 +174,6 @@ export default function Documents() {
       </div>
 
       <AnimatePresence>
-        {/* Summary Modal */}
         {selectedSummary && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -220,7 +213,6 @@ export default function Documents() {
           </motion.div>
         )}
 
-        {/* Delete Confirmation Modal */}
         {deleteId && (
           <motion.div 
             initial={{ opacity: 0 }}

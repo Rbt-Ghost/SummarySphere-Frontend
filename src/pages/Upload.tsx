@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { uploadFile } from "../api";
 
 import Footer from "../components/Footer";
-import { ToastProvider, toast } from "../components/Toast";
+import { toast } from "../components/Toast"; // Removed Provider import
 
 export default function Upload() {
   const [dark] = useState(() => {
@@ -108,7 +108,7 @@ export default function Upload() {
           : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"
       }
     >
-      <ToastProvider dark={dark} />
+      {/* ToastProvider REMOVED */}
 
       <button
         onClick={() => navigate("/")}

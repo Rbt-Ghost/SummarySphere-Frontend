@@ -12,7 +12,7 @@ import {
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
 import { fetchDocumentById, summarizeDocument, downloadDocument } from "../api";
-import { toast, ToastProvider } from "../components/Toast";
+import { toast } from "../components/Toast"; // Removed Provider import
 
 interface DocDetail {
   id: string;
@@ -85,8 +85,6 @@ export default function DocumentDetail() {
     try {
       setDocumentMeta({ ...documentMeta, status: "PROCESSING" });
       
-      // FIXED: Backend throws 500 if we request the same type twice.
-      // We append a timestamp to the type to ensure uniqueness (e.g. "general (v1709...)")
       const summaryType = summary ? `general (v${Date.now()})` : "general";
       
       const data = await summarizeDocument(id, summaryType);
@@ -136,9 +134,8 @@ export default function DocumentDetail() {
   return (
     <div className={dark ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24 relative pb-20" : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"}>
       
-      <ToastProvider dark={dark} />
+      {/* ToastProvider REMOVED */}
 
-      {/* Navigation Header */}
       <div className="w-full max-w-5xl flex justify-between items-center mb-8">
         <button
           onClick={() => navigate("/documents")}
