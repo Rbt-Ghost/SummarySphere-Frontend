@@ -302,21 +302,28 @@ export default function Documents() {
         ) : (
             <div className="space-y-4">
             <AnimatePresence>
-                {documents.map((doc) => (
+              {documents.map((doc) => {
+                const selectedType: SummaryType = summaryTypeByDocId[doc.id] || "detailed";
+                const hasSelectedSummary = Boolean(
+                safeLocalStorageGet(summaryStorageKey(doc.id, selectedType))
+                );
+                const isProcessing = doc.status === "PROCESSING";
+
+                return (
                 <motion.div
-                    key={doc.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    
-                    className={`
-                        group relative flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border transition-all
-                        ${dark 
-                            ? "bg-slate-800 border-slate-700 hover:border-slate-600" 
-                            : "bg-white border-zinc-200 shadow-sm hover:border-zinc-300"
-                        }
-                    `}
+                  key={doc.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                      
+                  className={`
+                    group relative flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border transition-all
+                    ${dark 
+                      ? "bg-slate-800 border-slate-700 hover:border-slate-600" 
+                      : "bg-white border-zinc-200 shadow-sm hover:border-zinc-300"
+                    }
+                  `}
                 >
                     <div className="flex items-start gap-4 mb-4 md:mb-0">
                         <div className={`p-3 rounded-lg ${dark ? 'bg-slate-700' : 'bg-zinc-100'}`}>
@@ -340,23 +347,25 @@ export default function Documents() {
                     <div className="flex items-center gap-4 justify-between md:justify-end w-full md:w-auto">
                         <div className={`
                             px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5
-                            ${doc.status === 'COMPLETED' 
-                                ? 'bg-green-500/10 text-green-500' 
-                                : doc.status === 'PROCESSING'
-                                ? 'bg-blue-500/10 text-blue-500'
+                            ${isProcessing
+                              ? 'bg-blue-500/10 text-blue-500'
+                              : hasSelectedSummary
+                                ? 'bg-green-500/10 text-green-500'
                                 : 'bg-yellow-500/10 text-yellow-500'
                             }
                         `}>
-                            {doc.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
-                            {doc.status === 'PROCESSING' && <Loader2 className="w-3 h-3 animate-spin" />}
-                            {(doc.status === 'PENDING' || !doc.status) && <Clock className="w-3 h-3" />}
-                            <span className="capitalize">{doc.status === 'COMPLETED' ? 'SUMMARIZED' : (doc.status || 'Pending')}</span>
+                            {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
+                            {!isProcessing && hasSelectedSummary && <CheckCircle2 className="w-3 h-3" />}
+                            {!isProcessing && !hasSelectedSummary && <Clock className="w-3 h-3" />}
+                            <span className="capitalize">
+                              {isProcessing ? "Processing" : hasSelectedSummary ? "Summarized" : "Not summarized"}
+                            </span>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <select
                             aria-label="Summary type"
-                            value={summaryTypeByDocId[doc.id] || "detailed"}
+                            value={selectedType}
                             onChange={(e) => handleSummaryTypeChange(doc.id, e.target.value as SummaryType)}
                             disabled={doc.status === "PROCESSING"}
                             className={`
@@ -374,42 +383,32 @@ export default function Documents() {
                             <option value="bullet-points">Bullet points</option>
                           </select>
 
-                          {(() => {
-                            const selectedType: SummaryType = summaryTypeByDocId[doc.id] || "detailed";
-                            const hasSelectedSummary = Boolean(safeLocalStorageGet(summaryStorageKey(doc.id, selectedType)));
-                            const canView = doc.status === "COMPLETED" && hasSelectedSummary;
-
-                            if (canView) {
-                              return (
-                                <button
-                                  onClick={() => navigate(`/documents/${doc.id}?summaryType=${encodeURIComponent(selectedType)}`)}
-                                  title="View Summary"
-                                  className={`p-2 rounded-lg transition-colors ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}`}
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                              );
-                            }
-
-                            return (
-                              <button
-                                onClick={() => handleSummarize(doc.id)}
-                                title={doc.status === "COMPLETED" ? "Generate this summary type" : "Summarize"}
-                                disabled={doc.status === "PROCESSING"}
-                                className={`
-                                  p-2 rounded-lg transition-colors
-                                  ${doc.status === "PROCESSING"
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : dark
-                                      ? "hover:bg-slate-700"
-                                      : "hover:bg-zinc-100"
-                                  }
-                                `}
-                              >
-                                <Sparkles className="w-4 h-4" />
-                              </button>
-                            );
-                          })()}
+                          {hasSelectedSummary ? (
+                            <button
+                              onClick={() => navigate(`/documents/${doc.id}?summaryType=${encodeURIComponent(selectedType)}`)}
+                              title="View Summary"
+                              className={`p-2 rounded-lg transition-colors ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSummarize(doc.id)}
+                              title={doc.status === "COMPLETED" ? "Generate this summary type" : "Summarize"}
+                              disabled={doc.status === "PROCESSING"}
+                              className={`
+                                p-2 rounded-lg transition-colors
+                                ${doc.status === "PROCESSING"
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : dark
+                                    ? "hover:bg-slate-700"
+                                    : "hover:bg-zinc-100"
+                                }
+                              `}
+                            >
+                              <Sparkles className="w-4 h-4" />
+                            </button>
+                          )}
 
                             <button 
                                 onClick={() => handleDownload(doc)}
@@ -431,7 +430,8 @@ export default function Documents() {
                         </div>
                     </div>
                 </motion.div>
-                ))}
+                    );
+                  })}
             </AnimatePresence>
             </div>
         )}
