@@ -223,16 +223,6 @@ export default function DocumentDetail() {
                   )}
                 </CTAButton>
               )}
-              
-              {summary && (
-                 <button 
-                 onClick={handleSummarize}
-                 disabled={isSummarizing}
-                 className="text-sm text-purple-500 hover:text-purple-400 font-medium flex items-center gap-1"
-               >
-                 <Sparkles className="w-3 h-3" /> Regenerate
-               </button>
-              )}
             </div>
 
             <div className="flex-1">

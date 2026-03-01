@@ -11,7 +11,6 @@ import {
   Plus,
   Sparkles,
   Eye,
-  X,
   AlertTriangle 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -29,6 +28,12 @@ interface Doc {
   status: string;
   uploadedAt: string; 
 }
+
+type SummaryType = "detailed" | "concise" | "bullet-points";
+
+const isValidSummaryType = (value: string | null): value is SummaryType => {
+  return value === "detailed" || value === "concise" || value === "bullet-points";
+};
 
 export default function Documents() {
   const [dark] = useState(() => {
@@ -60,8 +65,8 @@ export default function Documents() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
-  const [selectedSummary, setSelectedSummary] = useState<{title: string, content: string} | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [summaryTypeByDocId, setSummaryTypeByDocId] = useState<Record<string, SummaryType>>({});
 
   const loadDocs = async () => {
     try {
@@ -78,6 +83,25 @@ export default function Documents() {
   useEffect(() => {
     loadDocs();
   }, []);
+
+  useEffect(() => {
+    if (documents.length === 0) return;
+
+    setSummaryTypeByDocId((prev) => {
+      let changed = false;
+      const next: Record<string, SummaryType> = { ...prev };
+
+      for (const doc of documents) {
+        if (next[doc.id]) continue;
+
+        const saved = localStorage.getItem(`summaryType-${doc.id}`);
+        next[doc.id] = isValidSummaryType(saved) ? saved : "detailed";
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [documents]);
 
   const handleDeleteClick = (id: string) => {
     setDeleteId(id);
@@ -114,7 +138,8 @@ export default function Documents() {
     setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PROCESSING" } : doc)));
 
     try {
-      const data = await summarizeDocument(id, "general");
+      const summaryType: SummaryType = summaryTypeByDocId[id] || "detailed";
+      const data = await summarizeDocument(id, summaryType);
 
       if (data && data.message) {
         localStorage.setItem(`summary-${id}`, data.message);
@@ -129,17 +154,9 @@ export default function Documents() {
     }
   };
 
-  const handleViewSummary = (id: string) => {
-    const summaryText = localStorage.getItem(`summary-${id}`);
-    
-    const doc = documents.find(d => d.id === id);
-    const displayTitle = doc?.title || doc?.fileName || "Document";
-
-    if (summaryText) {
-      setSelectedSummary({ title: `Document: ${displayTitle}`, content: summaryText });
-    } else {
-      toast.error("Summary content not found. Please summarize again.");
-    }
+  const handleSummaryTypeChange = (docId: string, summaryType: SummaryType) => {
+    setSummaryTypeByDocId((prev) => ({ ...prev, [docId]: summaryType }));
+    localStorage.setItem(`summaryType-${docId}`, summaryType);
   };
 
   return (
@@ -172,46 +189,6 @@ export default function Documents() {
       </div>
 
       <AnimatePresence>
-        {/* Summary Modal */}
-        {selectedSummary && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => setSelectedSummary(null)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`relative w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl p-6 ${dark ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}
-            >
-              <button 
-                onClick={() => setSelectedSummary(null)}
-                className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              
-              <h3 className="text-xl font-bold mb-4 pr-8">{selectedSummary.title}</h3>
-              <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed opacity-90">
-                {selectedSummary.content}
-              </div>
-              
-              <div className="mt-8 flex justify-end">
-                <button
-                    onClick={() => setSelectedSummary(null)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${dark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-zinc-100 hover:bg-zinc-200'}`}
-                >
-                    Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
         {/* Delete Confirmation Modal */}
         {deleteId && (
           <motion.div 
@@ -301,11 +278,10 @@ export default function Documents() {
                             <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                            <h3 
-                                onClick={() => navigate(`/documents/${doc.id}`)}
-                                className="font-semibold truncate max-w-[200px] sm:max-w-xs cursor-pointer hover:text-blue-500 hover:underline transition-colors" 
-                                title="Click to view details"
-                            >
+                          <h3
+                            className="font-semibold truncate max-w-[200px] sm:max-w-xs"
+                            title={doc.title || doc.fileName}
+                          >
                                 {doc.title || doc.fileName}
                             </h3>
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
@@ -333,9 +309,29 @@ export default function Documents() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          <select
+                            aria-label="Summary type"
+                            value={summaryTypeByDocId[doc.id] || "detailed"}
+                            onChange={(e) => handleSummaryTypeChange(doc.id, e.target.value as SummaryType)}
+                            disabled={doc.status === "PROCESSING"}
+                            className={`
+                              h-9 px-2 rounded-lg text-xs font-medium border transition-colors
+                              ${doc.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
+                              ${dark
+                              ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
+                              : "bg-white border-zinc-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                              }
+                            `}
+                            title="Choose summary type"
+                          >
+                            <option value="detailed">Detailed</option>
+                            <option value="concise">Concise</option>
+                            <option value="bullet-points">Bullet points</option>
+                          </select>
+
                             {doc.status === "COMPLETED" ? (
                                 <button
-                                    onClick={() => handleViewSummary(doc.id)}
+                              onClick={() => navigate(`/documents/${doc.id}`)}
                                     title="View Summary"
                                     className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
                                 >
