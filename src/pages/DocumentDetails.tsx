@@ -85,7 +85,7 @@ export default function DocumentDetail() {
     try {
       setDocumentMeta({ ...documentMeta, status: "PROCESSING" });
       
-      const summaryType = summary ? `general (v${Date.now()})` : "general";
+      const summaryType = "detailed"; 
       
       const data = await summarizeDocument(id, summaryType);
       
