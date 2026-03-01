@@ -41,6 +41,10 @@ const safeLocalStorageGet = (key: string) => {
   }
 };
 
+const lastSummarizedTypeKey = (docId: string) => {
+  return `lastSummarizedType-${docId}`;
+};
+
 export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -87,6 +91,11 @@ export default function DocumentDetail() {
         : "detailed";
     setSummaryType(initial);
 
+    const inferredLegacyTypeRaw = safeLocalStorageGet(lastSummarizedTypeKey(id)) || fromSaved;
+    const inferredLegacyType: SummaryType | null = isValidSummaryType(inferredLegacyTypeRaw)
+      ? inferredLegacyTypeRaw
+      : null;
+
     const loadData = async () => {
       try {
         const doc = await fetchDocumentById(id);
@@ -96,11 +105,10 @@ export default function DocumentDetail() {
         const legacySummary = safeLocalStorageGet(`summary-${id}`);
         if (typedSummary) {
           setSummary(typedSummary);
-        } else if (initial === "detailed" && legacySummary) {
-          // Migration: treat legacy summary as detailed.
+        } else if (legacySummary && inferredLegacyType && inferredLegacyType === initial) {
           setSummary(legacySummary);
           try {
-            localStorage.setItem(summaryStorageKey(id, "detailed"), legacySummary);
+            localStorage.setItem(summaryStorageKey(id, inferredLegacyType), legacySummary);
           } catch {
             // ignore
           }
@@ -123,15 +131,20 @@ export default function DocumentDetail() {
     const typedSummary = safeLocalStorageGet(summaryStorageKey(id, summaryType));
     const legacySummary = safeLocalStorageGet(`summary-${id}`);
 
+    const inferredLegacyTypeRaw = safeLocalStorageGet(lastSummarizedTypeKey(id)) || safeLocalStorageGet(`summaryType-${id}`);
+    const inferredLegacyType: SummaryType | null = isValidSummaryType(inferredLegacyTypeRaw)
+      ? inferredLegacyTypeRaw
+      : null;
+
     if (typedSummary) {
       setSummary(typedSummary);
       return;
     }
 
-    if (summaryType === "detailed" && legacySummary) {
+    if (legacySummary && inferredLegacyType && inferredLegacyType === summaryType) {
       setSummary(legacySummary);
       try {
-        localStorage.setItem(summaryStorageKey(id, "detailed"), legacySummary);
+        localStorage.setItem(summaryStorageKey(id, inferredLegacyType), legacySummary);
       } catch {
         // ignore
       }
@@ -155,6 +168,7 @@ export default function DocumentDetail() {
           localStorage.setItem(`summary-${id}`, data.message);
           localStorage.setItem(summaryStorageKey(id, summaryType), data.message);
           localStorage.setItem(`summaryType-${id}`, summaryType);
+          localStorage.setItem(lastSummarizedTypeKey(id), summaryType);
         } catch {
           // ignore
         }

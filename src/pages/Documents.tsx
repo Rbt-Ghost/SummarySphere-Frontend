@@ -49,6 +49,10 @@ const safeLocalStorageGet = (key: string) => {
   }
 };
 
+const lastSummarizedTypeKey = (docId: string) => {
+  return `lastSummarizedType-${docId}`;
+};
+
 export default function Documents() {
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -123,7 +127,11 @@ export default function Documents() {
     for (const doc of documents) {
       const legacy = safeLocalStorageGet(`summary-${doc.id}`);
       if (!legacy) continue;
-      const typedKey = summaryStorageKey(doc.id, "detailed");
+
+      const inferred = safeLocalStorageGet(lastSummarizedTypeKey(doc.id)) || safeLocalStorageGet(`summaryType-${doc.id}`);
+      if (!isValidSummaryType(inferred)) continue;
+
+      const typedKey = summaryStorageKey(doc.id, inferred);
       if (safeLocalStorageGet(typedKey)) continue;
 
       try {
@@ -148,6 +156,7 @@ export default function Documents() {
       try {
         localStorage.removeItem(`summary-${deleteId}`);
         localStorage.removeItem(`summaryType-${deleteId}`);
+        localStorage.removeItem(lastSummarizedTypeKey(deleteId));
         for (const type of SUMMARY_TYPES) {
           localStorage.removeItem(summaryStorageKey(deleteId, type));
         }
@@ -184,6 +193,7 @@ export default function Documents() {
         try {
           localStorage.setItem(`summary-${id}`, data.message);
           localStorage.setItem(summaryStorageKey(id, summaryType), data.message);
+          localStorage.setItem(lastSummarizedTypeKey(id), summaryType);
         } catch {
           // ignore
         }
