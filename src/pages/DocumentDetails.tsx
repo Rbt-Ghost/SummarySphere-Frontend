@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -23,15 +23,35 @@ interface DocDetail {
   title?: string;
 }
 
+type SummaryType = "detailed" | "concise" | "bullet-points";
+
+const isValidSummaryType = (value: string | null): value is SummaryType => {
+  return value === "detailed" || value === "concise" || value === "bullet-points";
+};
+
+const summaryStorageKey = (docId: string, summaryType: SummaryType) => {
+  return `summary-${docId}-${summaryType}`;
+};
+
+const safeLocalStorageGet = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
 export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [documentMeta, setDocumentMeta] = useState<DocDetail | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summaryType, setSummaryType] = useState<SummaryType>("detailed");
 
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -58,14 +78,34 @@ export default function DocumentDetail() {
   useEffect(() => {
     if (!id) return;
 
+    const fromQuery = searchParams.get("summaryType");
+    const fromSaved = safeLocalStorageGet(`summaryType-${id}`);
+    const initial = isValidSummaryType(fromQuery)
+      ? fromQuery
+      : isValidSummaryType(fromSaved)
+        ? fromSaved
+        : "detailed";
+    setSummaryType(initial);
+
     const loadData = async () => {
       try {
         const doc = await fetchDocumentById(id);
         setDocumentMeta(doc);
-        
-        const savedSummary = localStorage.getItem(`summary-${id}`);
-        if (savedSummary) {
-          setSummary(savedSummary);
+
+        const typedSummary = safeLocalStorageGet(summaryStorageKey(id, initial));
+        const legacySummary = safeLocalStorageGet(`summary-${id}`);
+        if (typedSummary) {
+          setSummary(typedSummary);
+        } else if (initial === "detailed" && legacySummary) {
+          // Migration: treat legacy summary as detailed.
+          setSummary(legacySummary);
+          try {
+            localStorage.setItem(summaryStorageKey(id, "detailed"), legacySummary);
+          } catch {
+            // ignore
+          }
+        } else {
+          setSummary(null);
         }
       } catch (err) {
         setError("Failed to load document details.");
@@ -76,7 +116,30 @@ export default function DocumentDetail() {
     };
 
     loadData();
-  }, [id]);
+  }, [id, searchParams]);
+
+  useEffect(() => {
+    if (!id) return;
+    const typedSummary = safeLocalStorageGet(summaryStorageKey(id, summaryType));
+    const legacySummary = safeLocalStorageGet(`summary-${id}`);
+
+    if (typedSummary) {
+      setSummary(typedSummary);
+      return;
+    }
+
+    if (summaryType === "detailed" && legacySummary) {
+      setSummary(legacySummary);
+      try {
+        localStorage.setItem(summaryStorageKey(id, "detailed"), legacySummary);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    setSummary(null);
+  }, [id, summaryType]);
 
   const handleSummarize = async () => {
     if (!id || !documentMeta) return;
@@ -84,13 +147,17 @@ export default function DocumentDetail() {
     setIsSummarizing(true);
     try {
       setDocumentMeta({ ...documentMeta, status: "PROCESSING" });
-      
-      const summaryType = "detailed"; 
-      
+
       const data = await summarizeDocument(id, summaryType);
       
       if (data && data.message) {
-        localStorage.setItem(`summary-${id}`, data.message);
+        try {
+          localStorage.setItem(`summary-${id}`, data.message);
+          localStorage.setItem(summaryStorageKey(id, summaryType), data.message);
+          localStorage.setItem(`summaryType-${id}`, summaryType);
+        } catch {
+          // ignore
+        }
         setSummary(data.message);
         setDocumentMeta({ ...documentMeta, status: "COMPLETED" });
         toast.success("Summary generated successfully!"); 
@@ -102,6 +169,21 @@ export default function DocumentDetail() {
     } finally {
       setIsSummarizing(false);
     }
+  };
+
+  const handleSummaryTypeChange = (newType: SummaryType) => {
+    if (!id) return;
+    setSummaryType(newType);
+    try {
+      localStorage.setItem(`summaryType-${id}`, newType);
+    } catch {
+      // ignore
+    }
+
+    // Keep the URL in sync so deep-links work.
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("summaryType", newType);
+    navigate({ search: nextParams.toString() }, { replace: true });
   };
 
   const handleDownload = async () => {
@@ -206,23 +288,45 @@ export default function DocumentDetail() {
                 <Sparkles className="w-5 h-5 text-purple-500" />
                 Document Summary
               </h2>
-              
-              {!summary && (
-                <CTAButton 
-                  dark={dark} 
-                  size="small"
-                  onClick={handleSummarize}
-                  disabled={isSummarizing || documentMeta.status === "PROCESSING"}
+
+              <div className="flex items-center gap-3">
+                <select
+                  aria-label="Summary type"
+                  value={summaryType}
+                  onChange={(e) => handleSummaryTypeChange(e.target.value as SummaryType)}
+                  disabled={documentMeta.status === "PROCESSING"}
+                  className={`
+                    h-9 px-2 rounded-lg text-xs font-medium border transition-colors
+                    ${documentMeta.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
+                    ${dark
+                      ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
+                      : "bg-white border-zinc-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                    }
+                  `}
+                  title="Choose summary type"
                 >
-                  {isSummarizing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Generating...
-                    </>
-                  ) : (
-                    <>Generate Summary</>
-                  )}
-                </CTAButton>
-              )}
+                  <option value="detailed">Detailed</option>
+                  <option value="concise">Concise</option>
+                  <option value="bullet-points">Bullet points</option>
+                </select>
+
+                {!summary && (
+                  <CTAButton
+                    dark={dark}
+                    size="small"
+                    onClick={handleSummarize}
+                    disabled={isSummarizing || documentMeta.status === "PROCESSING"}
+                  >
+                    {isSummarizing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Generating...
+                      </>
+                    ) : (
+                      <>Generate Summary</>
+                    )}
+                  </CTAButton>
+                )}
+              </div>
             </div>
 
             <div className="flex-1">

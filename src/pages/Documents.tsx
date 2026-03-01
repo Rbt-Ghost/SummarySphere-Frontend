@@ -35,6 +35,20 @@ const isValidSummaryType = (value: string | null): value is SummaryType => {
   return value === "detailed" || value === "concise" || value === "bullet-points";
 };
 
+const SUMMARY_TYPES: SummaryType[] = ["detailed", "concise", "bullet-points"];
+
+const summaryStorageKey = (docId: string, summaryType: SummaryType) => {
+  return `summary-${docId}-${summaryType}`;
+};
+
+const safeLocalStorageGet = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
 export default function Documents() {
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -103,6 +117,23 @@ export default function Documents() {
     });
   }, [documents]);
 
+  useEffect(() => {
+    if (documents.length === 0) return;
+
+    for (const doc of documents) {
+      const legacy = safeLocalStorageGet(`summary-${doc.id}`);
+      if (!legacy) continue;
+      const typedKey = summaryStorageKey(doc.id, "detailed");
+      if (safeLocalStorageGet(typedKey)) continue;
+
+      try {
+        localStorage.setItem(typedKey, legacy);
+      } catch {
+        // ignore
+      }
+    }
+  }, [documents]);
+
   const handleDeleteClick = (id: string) => {
     setDeleteId(id);
   };
@@ -114,7 +145,15 @@ export default function Documents() {
       await deleteDocument(deleteId);
       
       setDocuments((prev) => prev.filter((doc) => doc.id !== deleteId));
-      localStorage.removeItem(`summary-${deleteId}`);
+      try {
+        localStorage.removeItem(`summary-${deleteId}`);
+        localStorage.removeItem(`summaryType-${deleteId}`);
+        for (const type of SUMMARY_TYPES) {
+          localStorage.removeItem(summaryStorageKey(deleteId, type));
+        }
+      } catch {
+        // ignore
+      }
       toast.success("Document deleted successfully");
     } catch (error) {
       console.error(error);
@@ -142,7 +181,12 @@ export default function Documents() {
       const data = await summarizeDocument(id, summaryType);
 
       if (data && data.message) {
-        localStorage.setItem(`summary-${id}`, data.message);
+        try {
+          localStorage.setItem(`summary-${id}`, data.message);
+          localStorage.setItem(summaryStorageKey(id, summaryType), data.message);
+        } catch {
+          // ignore
+        }
         toast.success("Summary generated successfully!");
       }
 
@@ -265,6 +309,7 @@ export default function Documents() {
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
+                    
                     className={`
                         group relative flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border transition-all
                         ${dark 
@@ -329,30 +374,42 @@ export default function Documents() {
                             <option value="bullet-points">Bullet points</option>
                           </select>
 
-                            {doc.status === "COMPLETED" ? (
+                          {(() => {
+                            const selectedType: SummaryType = summaryTypeByDocId[doc.id] || "detailed";
+                            const hasSelectedSummary = Boolean(safeLocalStorageGet(summaryStorageKey(doc.id, selectedType)));
+                            const canView = doc.status === "COMPLETED" && hasSelectedSummary;
+
+                            if (canView) {
+                              return (
                                 <button
-                              onClick={() => navigate(`/documents/${doc.id}`)}
-                                    title="View Summary"
-                                    className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                                  onClick={() => navigate(`/documents/${doc.id}?summaryType=${encodeURIComponent(selectedType)}`)}
+                                  title="View Summary"
+                                  className={`p-2 rounded-lg transition-colors ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}`}
                                 >
-                                    <Eye className="w-4 h-4" />
+                                  <Eye className="w-4 h-4" />
                                 </button>
-                            ) : (
-                                <button
-                                    onClick={() => handleSummarize(doc.id)}
-                                    title="Summarize"
-                                    disabled={doc.status === "PROCESSING"}
-                                    className={`
-                                        p-2 rounded-lg transition-colors
-                                        ${doc.status === "PROCESSING"
-                                            ? 'opacity-50 cursor-not-allowed'
-                                            : (dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100')
-                                        }
-                                    `}
-                                >
-                                    <Sparkles className="w-4 h-4" />
-                                </button>
-                            )}
+                              );
+                            }
+
+                            return (
+                              <button
+                                onClick={() => handleSummarize(doc.id)}
+                                title={doc.status === "COMPLETED" ? "Generate this summary type" : "Summarize"}
+                                disabled={doc.status === "PROCESSING"}
+                                className={`
+                                  p-2 rounded-lg transition-colors
+                                  ${doc.status === "PROCESSING"
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : dark
+                                      ? "hover:bg-slate-700"
+                                      : "hover:bg-zinc-100"
+                                  }
+                                `}
+                              >
+                                <Sparkles className="w-4 h-4" />
+                              </button>
+                            );
+                          })()}
 
                             <button 
                                 onClick={() => handleDownload(doc)}
