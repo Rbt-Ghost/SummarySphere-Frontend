@@ -1,23 +1,23 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  FileText, 
-  ArrowLeft, 
+import {
+  FileText,
+  ArrowLeft,
   Trash2,
-  Download, 
-  CheckCircle2, 
-  Clock, 
+  Download,
+  CheckCircle2,
+  Clock,
   Loader2,
   Plus,
   Sparkles,
   Eye,
-  AlertTriangle 
+  AlertTriangle
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
-import CTAButton from "../components/CTAbutton"; 
-import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument } from "../api"; 
+import CTAButton from "../components/CTAbutton";
+import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument } from "../api";
 import { toast } from "../components/Toast";
 
 interface Doc {
@@ -26,7 +26,7 @@ interface Doc {
   fileName: string;
   fileType: string;
   status: string;
-  uploadedAt: string; 
+  uploadedAt: string;
 }
 
 type SummaryType = "detailed" | "concise" | "bullet-points";
@@ -71,10 +71,10 @@ export default function Documents() {
     try {
       if (dark) {
         document.documentElement.classList.add("dark");
-        document.body.style.backgroundColor = "#0f172a"; 
+        document.body.style.backgroundColor = "#0f172a";
       } else {
         document.documentElement.classList.remove("dark");
-        document.body.style.backgroundColor = "#f4f4f5"; 
+        document.body.style.backgroundColor = "#f4f4f5";
       }
     } catch { /* ignore */ }
     return () => { document.body.style.backgroundColor = ""; };
@@ -89,7 +89,12 @@ export default function Documents() {
   const loadDocs = async () => {
     try {
       const apiDocs = await fetchDocuments();
-      setDocuments(apiDocs);
+
+      const sortedDocs = apiDocs.sort((a: Doc, b: Doc) => {
+        return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+      });
+
+      setDocuments(sortedDocs);
     } catch (error) {
       console.error("Failed to fetch documents:", error);
       toast.error("Failed to load documents");
@@ -148,10 +153,10 @@ export default function Documents() {
 
   const confirmDelete = async () => {
     if (!deleteId) return;
-    
+
     try {
       await deleteDocument(deleteId);
-      
+
       setDocuments((prev) => prev.filter((doc) => doc.id !== deleteId));
       try {
         localStorage.removeItem(`summary-${deleteId}`);
@@ -167,7 +172,7 @@ export default function Documents() {
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Error deleting document");
-      await loadDocs(); 
+      await loadDocs();
     } finally {
       setDeleteId(null);
     }
@@ -175,10 +180,10 @@ export default function Documents() {
 
   const handleDownload = async (doc: Doc) => {
     try {
-        await downloadDocument(doc.id, doc.fileName);
+      await downloadDocument(doc.id, doc.fileName);
     } catch (error) {
-        console.error("Download error:", error);
-        toast.error("Failed to download document.");
+      console.error("Download error:", error);
+      toast.error("Failed to download document.");
     }
   };
 
@@ -200,7 +205,7 @@ export default function Documents() {
         toast.success("Summary generated successfully!");
       }
 
-      await loadDocs(); 
+      await loadDocs();
 
     } catch (error) {
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
@@ -231,11 +236,11 @@ export default function Documents() {
           <ArrowLeft className="w-4 h-4" />
           Dashboard
         </button>
-        
-        <CTAButton 
-            dark={dark} 
-            size="small"
-            onClick={() => navigate("/upload")}
+
+        <CTAButton
+          dark={dark}
+          size="small"
+          onClick={() => navigate("/upload")}
         >
           <Plus className="w-4 h-4" />
           Upload New
@@ -245,14 +250,14 @@ export default function Documents() {
       <AnimatePresence>
         {/* Delete Confirmation Modal */}
         {deleteId && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
             onClick={() => setDeleteId(null)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -270,19 +275,19 @@ export default function Documents() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="mt-8 flex justify-end gap-3">
                 <button
-                    onClick={() => setDeleteId(null)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                  onClick={() => setDeleteId(null)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
                 >
-                    Cancel
+                  Cancel
                 </button>
                 <button
-                    onClick={confirmDelete}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all"
+                  onClick={confirmDelete}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all"
                 >
-                    Delete Document
+                  Delete Document
                 </button>
               </div>
             </motion.div>
@@ -299,157 +304,157 @@ export default function Documents() {
         <h2 className="text-3xl font-bold mb-6">My Documents</h2>
 
         {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-10 h-10 animate-spin opacity-50 mb-4" />
-                <p className="opacity-50">Loading documents from server...</p>
-            </div>
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-10 h-10 animate-spin opacity-50 mb-4" />
+            <p className="opacity-50">Loading documents from server...</p>
+          </div>
         ) : documents.length === 0 ? (
-            <div className={`text-center py-16 rounded-2xl border-2 border-dashed ${dark ? 'border-slate-800' : 'border-zinc-300'}`}>
-                <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <h3 className="text-lg font-medium mb-1">No documents found</h3>
-                <p className="opacity-60 text-sm">Upload a document to get started.</p>
-            </div>
+          <div className={`text-center py-16 rounded-2xl border-2 border-dashed ${dark ? 'border-slate-800' : 'border-zinc-300'}`}>
+            <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <h3 className="text-lg font-medium mb-1">No documents found</h3>
+            <p className="opacity-60 text-sm">Upload a document to get started.</p>
+          </div>
         ) : (
-            <div className="space-y-4">
+          <div className="space-y-4">
             <AnimatePresence>
               {documents.map((doc) => {
                 const selectedType: SummaryType = summaryTypeByDocId[doc.id] || "detailed";
                 const hasSelectedSummary = Boolean(
-                safeLocalStorageGet(summaryStorageKey(doc.id, selectedType))
+                  safeLocalStorageGet(summaryStorageKey(doc.id, selectedType))
                 );
                 const isProcessing = doc.status === "PROCESSING";
 
                 return (
-                <motion.div
-                  key={doc.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                      
-                  className={`
+                  <motion.div
+                    key={doc.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+
+                    className={`
                     group relative flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border transition-all
-                    ${dark 
-                      ? "bg-slate-800 border-slate-700 hover:border-slate-600" 
-                      : "bg-white border-zinc-200 shadow-sm hover:border-zinc-300"
-                    }
+                    ${dark
+                        ? "bg-slate-800 border-slate-700 hover:border-slate-600"
+                        : "bg-white border-zinc-200 shadow-sm hover:border-zinc-300"
+                      }
                   `}
-                >
+                  >
                     <div className="flex items-start gap-4 mb-4 md:mb-0">
-                        <div className={`p-3 rounded-lg ${dark ? 'bg-slate-700' : 'bg-zinc-100'}`}>
-                            <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
+                      <div className={`p-3 rounded-lg ${dark ? 'bg-slate-700' : 'bg-zinc-100'}`}>
+                        <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
+                      </div>
+                      <div>
+                        <h3
+                          className="font-semibold truncate max-w-[200px] sm:max-w-xs"
+                          title={doc.title || doc.fileName}
+                        >
+                          {doc.title || doc.fileName}
+                        </h3>
+                        <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
+                          <span className="truncate max-w-[150px]" title={doc.fileName}>{doc.fileName}</span>
+                          <span>•</span>
+                          <span>
+                            {new Date(doc.uploadedAt).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric"
+                            })}
+                          </span>
                         </div>
-                        <div>
-                          <h3
-                            className="font-semibold truncate max-w-[200px] sm:max-w-xs"
-                            title={doc.title || doc.fileName}
-                          >
-                                {doc.title || doc.fileName}
-                            </h3>
-                            <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
-                                <span className="truncate max-w-[150px]" title={doc.fileName}>{doc.fileName}</span>
-                                <span>•</span>
-                                <span>
-                                  {new Date(doc.uploadedAt).toLocaleDateString("en-GB", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric"
-                                  })}
-                                </span>
-                            </div>
-                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-4 justify-between md:justify-end w-full md:w-auto">
-                        <div className={`
+                      <div className={`
                             px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5
                             ${isProcessing
-                              ? 'bg-blue-500/10 text-blue-500'
-                              : hasSelectedSummary
-                                ? 'bg-green-500/10 text-green-500'
-                                : 'bg-yellow-500/10 text-yellow-500'
-                            }
+                          ? 'bg-blue-500/10 text-blue-500'
+                          : hasSelectedSummary
+                            ? 'bg-green-500/10 text-green-500'
+                            : 'bg-yellow-500/10 text-yellow-500'
+                        }
                         `}>
-                            {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
-                            {!isProcessing && hasSelectedSummary && <CheckCircle2 className="w-3 h-3" />}
-                            {!isProcessing && !hasSelectedSummary && <Clock className="w-3 h-3" />}
-                            <span className="capitalize">
-                              {isProcessing ? "Processing" : hasSelectedSummary ? "Summarized" : "Not summarized"}
-                            </span>
-                        </div>
+                        {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {!isProcessing && hasSelectedSummary && <CheckCircle2 className="w-3 h-3" />}
+                        {!isProcessing && !hasSelectedSummary && <Clock className="w-3 h-3" />}
+                        <span className="capitalize">
+                          {isProcessing ? "Processing" : hasSelectedSummary ? "Summarized" : "Not summarized"}
+                        </span>
+                      </div>
 
-                        <div className="flex items-center gap-2">
-                          <select
-                            aria-label="Summary type"
-                            value={selectedType}
-                            onChange={(e) => handleSummaryTypeChange(doc.id, e.target.value as SummaryType)}
-                            disabled={doc.status === "PROCESSING"}
-                            className={`
+                      <div className="flex items-center gap-2">
+                        <select
+                          aria-label="Summary type"
+                          value={selectedType}
+                          onChange={(e) => handleSummaryTypeChange(doc.id, e.target.value as SummaryType)}
+                          disabled={doc.status === "PROCESSING"}
+                          className={`
                               h-9 px-2 rounded-lg text-xs font-medium border transition-colors
                               ${doc.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
                               ${dark
                               ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
                               : "bg-white border-zinc-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-                              }
+                            }
                             `}
-                            title="Choose summary type"
-                          >
-                            <option value="detailed">Detailed</option>
-                            <option value="concise">Concise</option>
-                            <option value="bullet-points">Bullet points</option>
-                          </select>
+                          title="Choose summary type"
+                        >
+                          <option value="detailed">Detailed</option>
+                          <option value="concise">Concise</option>
+                          <option value="bullet-points">Bullet points</option>
+                        </select>
 
-                          {hasSelectedSummary ? (
-                            <button
-                              onClick={() => navigate(`/documents/${doc.id}?summaryType=${encodeURIComponent(selectedType)}`)}
-                              title="View Summary"
-                              className={`p-2 rounded-lg transition-colors ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}`}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleSummarize(doc.id)}
-                              title={doc.status === "COMPLETED" ? "Generate this summary type" : "Summarize"}
-                              disabled={doc.status === "PROCESSING"}
-                              className={`
+                        {hasSelectedSummary ? (
+                          <button
+                            onClick={() => navigate(`/documents/${doc.id}?summaryType=${encodeURIComponent(selectedType)}`)}
+                            title="View Summary"
+                            className={`p-2 rounded-lg transition-colors ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSummarize(doc.id)}
+                            title={doc.status === "COMPLETED" ? "Generate this summary type" : "Summarize"}
+                            disabled={doc.status === "PROCESSING"}
+                            className={`
                                 p-2 rounded-lg transition-colors
                                 ${doc.status === "PROCESSING"
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : dark
-                                    ? "hover:bg-slate-700"
-                                    : "hover:bg-zinc-100"
-                                }
+                                ? "opacity-50 cursor-not-allowed"
+                                : dark
+                                  ? "hover:bg-slate-700"
+                                  : "hover:bg-zinc-100"
+                              }
                               `}
-                            >
-                              <Sparkles className="w-4 h-4" />
-                            </button>
-                          )}
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                        )}
 
-                            <button 
-                                onClick={() => handleDownload(doc)}
-                                title="Download"
-                                className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
-                            >
-                                <Download className="w-4 h-4" />
-                            </button>
+                        <button
+                          onClick={() => handleDownload(doc)}
+                          title="Download"
+                          className={`p-2 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
 
-                            <div className={`w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
+                        <div className={`w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
 
-                            <button 
-                                onClick={() => handleDeleteClick(doc.id)}
-                                title="Delete"
-                                className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <button
+                          onClick={() => handleDeleteClick(doc.id)}
+                          title="Delete"
+                          className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                </motion.div>
-                    );
-                  })}
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
-            </div>
+          </div>
         )}
       </motion.div>
 
