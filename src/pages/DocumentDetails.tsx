@@ -263,7 +263,13 @@ export default function DocumentDetail() {
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="opacity-60 flex items-center gap-2"><Calendar className="w-4 h-4"/> Uploaded</span>
-                <span>{new Date(documentMeta.uploadedAt).toLocaleDateString()}</span>
+                <span>
+                  {new Date(documentMeta.uploadedAt).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric"
+                                  })}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="opacity-60">Type</span>

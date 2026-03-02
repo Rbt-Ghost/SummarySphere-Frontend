@@ -349,7 +349,13 @@ export default function Documents() {
                             <div className="flex items-center gap-3 text-xs opacity-60 mt-1">
                                 <span className="truncate max-w-[150px]" title={doc.fileName}>{doc.fileName}</span>
                                 <span>•</span>
-                                <span>{new Date(doc.uploadedAt).toLocaleDateString()}</span>
+                                <span>
+                                  {new Date(doc.uploadedAt).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric"
+                                  })}
+                                </span>
                             </div>
                         </div>
                     </div>
