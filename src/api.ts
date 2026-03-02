@@ -13,12 +13,12 @@ const throwError = async (response: Response, defaultMsg: string) => {
 
         try {
             const json = JSON.parse(text);
-            if (json.status === 500) {
-                errorMsg = "Internal Server Error. Please try again later.";
-            } else if (json.message) {
+            if (json.message) {
                 errorMsg = json.message;
             } else if (json.error) {
                  errorMsg = json.error;
+            } else if (json.status === 500) {
+                errorMsg = "Internal Server Error. Please try again later.";
             }
         } catch {
             if (text.length < 200) {
@@ -40,6 +40,10 @@ const authHeaders = (): Record<string, string> => {
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };
 };
+
+// Some backends may not implement GET /summary/{type} (or may error on it).
+// Cache a simple runtime health flag so we don't spam the endpoint on every switch.
+let typedSummaryEndpointHealth: "unknown" | "ok" | "bad" = "unknown";
 
 export const uploadFile = async (file: File, title: string) => {
     const formData = new FormData();
@@ -133,4 +137,96 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
   }
 
   return response.json();
+};
+
+type DocumentSummaryResponse = {
+    documentId?: string;
+    summaryType?: string;
+    summaryText?: string;
+    status?: string;
+    createdAt?: string;
+    message?: string;
+};
+
+const extractSummaryText = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== "object") return null;
+    const maybe = payload as Record<string, unknown>;
+    const summaryText = maybe.summaryText;
+    if (typeof summaryText === "string" && summaryText.trim()) return summaryText;
+    const message = maybe.message;
+    if (typeof message === "string" && message.trim()) return message;
+    const summary = maybe.summary;
+    if (typeof summary === "string" && summary.trim()) return summary;
+    return null;
+};
+
+/**
+ * Tries to fetch an existing summary from backend.
+ * Primary: GET /api/documents/{id}/summary/{summaryType}
+ * Fallback: GET /api/documents/{id}/summary (returns latest), shown only if types match.
+ */
+export const fetchDocumentSummary = async (id: string, summaryType: string): Promise<string | null> => {
+    const encodedType = encodeURIComponent(summaryType);
+
+    const tryFallback = async (): Promise<string | null> => {
+        const fallback = await fetch(`${BASE_URL}/${id}/summary?t=${Date.now()}`, {
+            headers: {
+                ...NO_CACHE_HEADERS,
+                ...authHeaders(),
+            },
+        });
+
+        if (fallback.status === 404) return null;
+        if (!fallback.ok) await throwError(fallback, "Failed to fetch document summary");
+
+        const payload: DocumentSummaryResponse = await fallback.json().catch(() => ({} as DocumentSummaryResponse));
+        const returnedType = typeof payload.summaryType === "string" ? payload.summaryType : "";
+        if (returnedType && returnedType.toLowerCase() !== summaryType.toLowerCase()) return null;
+        return extractSummaryText(payload);
+    };
+
+    // Prefer the stable "latest summary" endpoint first.
+    // On some backends, the typed endpoint /summary/{type} may be missing or may error (500),
+    // especially when the requested type doesn't exist. Avoid hitting it unless we know it's healthy.
+    const latest = await tryFallback();
+    if (latest !== null) return latest;
+
+    // If we haven't proven the typed endpoint works, don't call it.
+    if (typedSummaryEndpointHealth !== "ok") {
+        return null;
+    }
+
+    const primary = await fetch(`${BASE_URL}/${id}/summary/${encodedType}?t=${Date.now()}`, {
+        headers: {
+            ...NO_CACHE_HEADERS,
+            ...authHeaders(),
+        },
+    });
+
+    // Prefer the typed endpoint; if it isn't available (404) or fails, fall back to latest summary.
+    if (primary.status === 404 || primary.status === 405) {
+        typedSummaryEndpointHealth = "bad";
+        return null;
+    }
+
+    if (!primary.ok) {
+        // If auth is invalid, surface the error so the app can react appropriately.
+        if (primary.status === 401 || primary.status === 403) {
+            await throwError(primary, "Failed to fetch document summary");
+        }
+
+        if (primary.status >= 500) {
+            typedSummaryEndpointHealth = "bad";
+        }
+
+        // Some backends may not implement the typed route and respond with non-404 errors.
+        // For summary display, treat other errors as "no summary available".
+        // This avoids breaking the details view due to a backend mismatch.
+        return null;
+    }
+
+    typedSummaryEndpointHealth = "ok";
+
+    const payload: DocumentSummaryResponse = await primary.json().catch(() => ({} as DocumentSummaryResponse));
+    return extractSummaryText(payload);
 };

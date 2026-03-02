@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
-import { fetchDocumentById, summarizeDocument, downloadDocument } from "../api";
+import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary } from "../api";
 import { toast } from "../components/Toast"; // Removed Provider import
 
 interface DocDetail {
@@ -29,16 +29,16 @@ const isValidSummaryType = (value: string | null): value is SummaryType => {
   return value === "detailed" || value === "concise" || value === "bullet-points";
 };
 
-const summaryStorageKey = (docId: string, summaryType: SummaryType) => {
-  return `summary-${docId}-${summaryType}`;
-};
-
 const safeLocalStorageGet = (key: string) => {
   try {
     return localStorage.getItem(key);
   } catch {
     return null;
   }
+};
+
+const summaryStorageKey = (docId: string, summaryType: SummaryType) => {
+  return `summary-${docId}-${summaryType}`;
 };
 
 const lastSummarizedTypeKey = (docId: string) => {
@@ -56,6 +56,8 @@ export default function DocumentDetail() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summaryType, setSummaryType] = useState<SummaryType>("detailed");
+  const [isSummaryTypeInitialized, setIsSummaryTypeInitialized] = useState(false);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -90,31 +92,12 @@ export default function DocumentDetail() {
         ? fromSaved
         : "detailed";
     setSummaryType(initial);
-
-    const inferredLegacyTypeRaw = safeLocalStorageGet(lastSummarizedTypeKey(id)) || fromSaved;
-    const inferredLegacyType: SummaryType | null = isValidSummaryType(inferredLegacyTypeRaw)
-      ? inferredLegacyTypeRaw
-      : null;
+    setIsSummaryTypeInitialized(true);
 
     const loadData = async () => {
       try {
         const doc = await fetchDocumentById(id);
         setDocumentMeta(doc);
-
-        const typedSummary = safeLocalStorageGet(summaryStorageKey(id, initial));
-        const legacySummary = safeLocalStorageGet(`summary-${id}`);
-        if (typedSummary) {
-          setSummary(typedSummary);
-        } else if (legacySummary && inferredLegacyType && inferredLegacyType === initial) {
-          setSummary(legacySummary);
-          try {
-            localStorage.setItem(summaryStorageKey(id, inferredLegacyType), legacySummary);
-          } catch {
-            // ignore
-          }
-        } else {
-          setSummary(null);
-        }
       } catch (err) {
         setError("Failed to load document details.");
         console.error(err);
@@ -127,32 +110,51 @@ export default function DocumentDetail() {
   }, [id, searchParams]);
 
   useEffect(() => {
-    if (!id) return;
-    const typedSummary = safeLocalStorageGet(summaryStorageKey(id, summaryType));
-    const legacySummary = safeLocalStorageGet(`summary-${id}`);
+    if (!id || !isSummaryTypeInitialized) return;
 
-    const inferredLegacyTypeRaw = safeLocalStorageGet(lastSummarizedTypeKey(id)) || safeLocalStorageGet(`summaryType-${id}`);
-    const inferredLegacyType: SummaryType | null = isValidSummaryType(inferredLegacyTypeRaw)
-      ? inferredLegacyTypeRaw
-      : null;
+    let cancelled = false;
 
-    if (typedSummary) {
-      setSummary(typedSummary);
+    // If we already have this exact type cached, show it immediately and skip API calls.
+    const cachedTyped = safeLocalStorageGet(summaryStorageKey(id, summaryType));
+    if (cachedTyped) {
+      setIsLoadingSummary(false);
+      setSummary(cachedTyped);
       return;
     }
 
-    if (legacySummary && inferredLegacyType && inferredLegacyType === summaryType) {
-      setSummary(legacySummary);
-      try {
-        localStorage.setItem(summaryStorageKey(id, inferredLegacyType), legacySummary);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-
+    setIsLoadingSummary(true);
     setSummary(null);
-  }, [id, summaryType]);
+
+    (async () => {
+      try {
+        const existing = await fetchDocumentSummary(id, summaryType);
+        if (cancelled) return;
+        if (existing) {
+          setSummary(existing);
+          return;
+        }
+
+        const legacy = safeLocalStorageGet(`summary-${id}`);
+        const lastType = safeLocalStorageGet(lastSummarizedTypeKey(id));
+        if (legacy && lastType && lastType.toLowerCase() === summaryType.toLowerCase()) {
+          setSummary(legacy);
+          return;
+        }
+
+        setSummary(null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error(err);
+        setSummary(null);
+      } finally {
+        if (!cancelled) setIsLoadingSummary(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, summaryType, isSummaryTypeInitialized]);
 
   const handleSummarize = async () => {
     if (!id || !documentMeta) return;
@@ -164,15 +166,14 @@ export default function DocumentDetail() {
       const data = await summarizeDocument(id, summaryType);
       
       if (data && data.message) {
+        setSummary(data.message);
         try {
           localStorage.setItem(`summary-${id}`, data.message);
           localStorage.setItem(summaryStorageKey(id, summaryType), data.message);
-          localStorage.setItem(`summaryType-${id}`, summaryType);
           localStorage.setItem(lastSummarizedTypeKey(id), summaryType);
         } catch {
           // ignore
         }
-        setSummary(data.message);
         setDocumentMeta({ ...documentMeta, status: "COMPLETED" });
         toast.success("Summary generated successfully!"); 
       }
@@ -357,10 +358,10 @@ export default function DocumentDetail() {
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-8">
-                  {isSummarizing ? (
+                  {isSummarizing || isLoadingSummary ? (
                      <div className="flex flex-col items-center gap-3">
                         <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
-                        <p>Analyzing document...</p>
+                        <p>{isSummarizing ? "Analyzing document..." : "Loading summary..."}</p>
                      </div>
                   ) : (
                     <>
