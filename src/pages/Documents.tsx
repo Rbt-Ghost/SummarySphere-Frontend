@@ -89,7 +89,7 @@ export default function Documents() {
   const loadDocs = async () => {
     try {
       const apiDocs = await fetchDocuments();
-      setDocuments(apiDocs.reverse());
+      setDocuments(apiDocs);
     } catch (error) {
       console.error("Failed to fetch documents:", error);
       toast.error("Failed to load documents");
