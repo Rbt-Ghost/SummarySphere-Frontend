@@ -1,4 +1,3 @@
-// src/components/toast.tsx
 import { useEffect } from "react";
 import { Toaster, toast as hotToast, useToasterStore } from "react-hot-toast";
 

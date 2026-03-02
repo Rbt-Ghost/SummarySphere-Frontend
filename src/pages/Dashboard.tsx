@@ -4,8 +4,10 @@ import { Sun, Moon } from "lucide-react";
 
 import CTAButton from "../components/CTAbutton";
 import Footer from "../components/Footer";
+import { useAuth } from "../services/authContext";
 
 export default function Dashboard() {
+  const { isAuthenticated } = useAuth();
   const [dark, setDark] = useState(() => {
     if(typeof window !== "undefined") {
       const savedMode = localStorage.getItem("darkMode");
@@ -52,20 +54,19 @@ export default function Dashboard() {
         Let's get started
       </CTAButton>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        className="mt-2"
-        onClick={() => window.location.href = "/documents"}
-      >
-        <a
-          href="#"
-          className="text-sm underline opacity-70 hover:opacity-100 transition-opacity"
+      {isAuthenticated ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mt-2"
+          onClick={() => (window.location.href = "/documents")}
         >
-          View documents list
-        </a>
-      </motion.div>
+          <a href="#" className="text-sm underline opacity-70 hover:opacity-100 transition-opacity">
+            View documents list
+          </a>
+        </motion.div>
+      ) : null}
 
       <Footer dark={dark} />
     </div>

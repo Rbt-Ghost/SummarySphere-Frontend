@@ -3,11 +3,14 @@ import { Route, Routes } from "react-router-dom";
 import './index.css'
 import LoadingPage from "./pages/Loading.tsx";
 import { ToastProvider } from "./components/Toast";
+import RequireAuth from "./components/RequireAuth";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Upload = lazy(() => import("./pages/Upload.tsx"));
 const Documents = lazy(() => import("./pages/Documents.tsx"));
 const DocumentDetails = lazy(() => import("./pages/DocumentDetails.tsx"));
+const Login = lazy(() => import("./pages/Login.tsx"));
+const SignUp = lazy(() => import("./pages/SignUp.tsx"));
 
 export default function App() {
   const [dark] = useState(() => {
@@ -27,10 +30,15 @@ export default function App() {
       <ToastProvider dark={dark} />
       
       <Routes>
-        <Route path="/" element={<Dashboard />} /> 
-        <Route path="/upload" element={<Upload />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/documents/:id" element={<DocumentDetails />} />
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+
+        <Route element={<RequireAuth />}>
+          <Route path="/upload" element={<Upload />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/documents/:id" element={<DocumentDetails />} />
+        </Route>
       </Routes>
     </Suspense>
   );

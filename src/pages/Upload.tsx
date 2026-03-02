@@ -92,7 +92,7 @@ export default function Upload() {
       toast.success("Document uploaded successfully"); 
       setSelectedFile(null);
       setTitle("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Network error during upload:", error);
       toast.error("Failed to upload document."); 
     } finally {

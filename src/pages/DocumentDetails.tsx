@@ -204,8 +204,9 @@ export default function DocumentDetail() {
     if (!documentMeta) return;
     try {
         await downloadDocument(documentMeta.id, documentMeta.fileName);
-    } catch (e) {
-        toast.error("Download failed");
+    } catch (err) {
+      console.error(err);
+      toast.error("Download failed");
     }
   };
 

@@ -1,3 +1,5 @@
+import { authStorage } from "./services/authStorage";
+
 const BASE_URL = "/api/documents"; 
 
 const throwError = async (response: Response, defaultMsg: string) => {
@@ -27,10 +29,16 @@ const throwError = async (response: Response, defaultMsg: string) => {
     throw new Error(errorMsg);
 }
 
-const NO_CACHE_HEADERS = {
+const NO_CACHE_HEADERS: Record<string, string> = {
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0'
+};
+
+const authHeaders = (): Record<string, string> => {
+    const token = authStorage.getToken();
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
 };
 
 export const uploadFile = async (file: File, title: string) => {
@@ -41,7 +49,10 @@ export const uploadFile = async (file: File, title: string) => {
     const response = await fetch(`${BASE_URL}`, {
         method: "POST",
         body: formData,
-        headers: NO_CACHE_HEADERS
+        headers: {
+            ...NO_CACHE_HEADERS,
+            ...authHeaders()
+        }
     });
 
     if (!response.ok) {
@@ -53,7 +64,10 @@ export const uploadFile = async (file: File, title: string) => {
 
 export const fetchDocuments = async () => {
   const response = await fetch(`${BASE_URL}?t=${Date.now()}`, {
-      headers: NO_CACHE_HEADERS
+            headers: {
+                    ...NO_CACHE_HEADERS,
+                    ...authHeaders()
+            }
   });
   if (!response.ok) await throwError(response, "Failed to fetch documents");
   return response.json();
@@ -61,7 +75,10 @@ export const fetchDocuments = async () => {
 
 export const fetchDocumentById = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}?t=${Date.now()}`, {
-      headers: NO_CACHE_HEADERS
+            headers: {
+                    ...NO_CACHE_HEADERS,
+                    ...authHeaders()
+            }
   });
   if (!response.ok) await throwError(response, "Failed to fetch document details");
   return response.json();
@@ -70,13 +87,20 @@ export const fetchDocumentById = async (id: string) => {
 export const deleteDocument = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`, { 
       method: "DELETE",
-      headers: NO_CACHE_HEADERS
+            headers: {
+                    ...NO_CACHE_HEADERS,
+                    ...authHeaders()
+            }
   });
   if (!response.ok) await throwError(response, "Failed to delete document");
 };
 
 export const downloadDocument = async (id: string, filename: string) => {
-  const response = await fetch(`${BASE_URL}/${id}/file`);
+    const response = await fetch(`${BASE_URL}/${id}/file`, {
+            headers: {
+                    ...authHeaders()
+            }
+    });
   
   if (!response.ok) {
       await throwError(response, "Failed to download file");
@@ -98,7 +122,8 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
     method: "POST", 
     headers: {
         "Content-Type": "application/json",
-        ...NO_CACHE_HEADERS
+                ...NO_CACHE_HEADERS,
+                ...authHeaders()
     },
     body: JSON.stringify({ summaryType }) 
   });
