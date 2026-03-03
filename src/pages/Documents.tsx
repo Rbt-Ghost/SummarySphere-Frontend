@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -17,7 +17,7 @@ import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
-import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument } from "../api";
+import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument, fetchDocumentSummary } from "../api";
 import { toast } from "../components/Toast";
 
 interface Doc {
@@ -85,6 +85,10 @@ export default function Documents() {
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [summaryTypeByDocId, setSummaryTypeByDocId] = useState<Record<string, SummaryType>>({});
+  const [serverSummaryAvailable, setServerSummaryAvailable] = useState<
+    Record<string, Partial<Record<SummaryType, boolean>>>
+  >({});
+  const summaryProbeInFlight = useRef<Set<string>>(new Set());
 
   const loadDocs = async () => {
     try {
@@ -125,6 +129,83 @@ export default function Documents() {
       return changed ? next : prev;
     });
   }, [documents]);
+
+  // Cross-device fix: if a document is already summarized on the backend, we should not rely
+  // on localStorage (which is per-device). Probe the backend for the selected summary type
+  // when:
+  // - document is COMPLETED
+  // - there is no local cached summary for that type
+  // Cache successful results in localStorage to keep the existing UI fast.
+  useEffect(() => {
+    if (documents.length === 0) return;
+
+    let cancelled = false;
+
+    const probe = async (docId: string, summaryType: SummaryType) => {
+      const inFlightKey = `${docId}:${summaryType}`;
+      if (summaryProbeInFlight.current.has(inFlightKey)) return;
+      summaryProbeInFlight.current.add(inFlightKey);
+
+      try {
+        const summaryText = await fetchDocumentSummary(docId, summaryType);
+        if (cancelled) return;
+        const available = Boolean(summaryText && summaryText.trim());
+
+        setServerSummaryAvailable((prev) => {
+          const existingForDoc = prev[docId] || {};
+          if (existingForDoc[summaryType] === available) return prev;
+          return {
+            ...prev,
+            [docId]: {
+              ...existingForDoc,
+              [summaryType]: available,
+            },
+          };
+        });
+
+        if (available && summaryText) {
+          try {
+            localStorage.setItem(summaryStorageKey(docId, summaryType), summaryText);
+            localStorage.setItem(lastSummarizedTypeKey(docId), summaryType);
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        if (cancelled) return;
+        setServerSummaryAvailable((prev) => {
+          const existingForDoc = prev[docId] || {};
+          if (existingForDoc[summaryType] === false) return prev;
+          return {
+            ...prev,
+            [docId]: {
+              ...existingForDoc,
+              [summaryType]: false,
+            },
+          };
+        });
+      } finally {
+        summaryProbeInFlight.current.delete(inFlightKey);
+      }
+    };
+
+    for (const doc of documents) {
+      if (doc.status !== "COMPLETED") continue;
+
+      const selectedType: SummaryType = summaryTypeByDocId[doc.id] || "detailed";
+      const localCached = Boolean(safeLocalStorageGet(summaryStorageKey(doc.id, selectedType)));
+      if (localCached) continue;
+
+      const alreadyProbed = serverSummaryAvailable[doc.id]?.[selectedType] !== undefined;
+      if (alreadyProbed) continue;
+
+      void probe(doc.id, selectedType);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documents, summaryTypeByDocId, serverSummaryAvailable]);
 
   useEffect(() => {
     if (documents.length === 0) return;
@@ -215,7 +296,11 @@ export default function Documents() {
 
   const handleSummaryTypeChange = (docId: string, summaryType: SummaryType) => {
     setSummaryTypeByDocId((prev) => ({ ...prev, [docId]: summaryType }));
-    localStorage.setItem(`summaryType-${docId}`, summaryType);
+    try {
+      localStorage.setItem(`summaryType-${docId}`, summaryType);
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -320,7 +405,8 @@ export default function Documents() {
               {documents.map((doc) => {
                 const selectedType: SummaryType = summaryTypeByDocId[doc.id] || "detailed";
                 const hasSelectedSummary = Boolean(
-                  safeLocalStorageGet(summaryStorageKey(doc.id, selectedType))
+                  safeLocalStorageGet(summaryStorageKey(doc.id, selectedType)) ||
+                  serverSummaryAvailable[doc.id]?.[selectedType]
                 );
                 const isProcessing = doc.status === "PROCESSING";
 
