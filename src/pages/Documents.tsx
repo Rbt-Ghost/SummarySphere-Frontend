@@ -130,12 +130,6 @@ export default function Documents() {
     });
   }, [documents]);
 
-  // Cross-device fix: if a document is already summarized on the backend, we should not rely
-  // on localStorage (which is per-device). Probe the backend for the selected summary type
-  // when:
-  // - document is COMPLETED
-  // - there is no local cached summary for that type
-  // Cache successful results in localStorage to keep the existing UI fast.
   useEffect(() => {
     if (documents.length === 0) return;
 
