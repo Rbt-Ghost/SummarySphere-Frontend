@@ -1,6 +1,7 @@
 import { authStorage } from "./services/authStorage";
 
-const BASE_URL = "/api/documents"; 
+const DOCUMENTS_BASE_URL = (import.meta.env.VITE_DOCUMENTS_BASE_URL as string | undefined) ?? "/api/documents";
+const USERS_BASE_URL = (import.meta.env.VITE_USERS_BASE_URL as string | undefined) ?? "/api/users";
 
 const throwError = async (response: Response, defaultMsg: string) => {
     // If the token is expired/invalid, clear it so the app can re-authenticate.
@@ -55,7 +56,7 @@ export const uploadFile = async (file: File, title: string) => {
     formData.append("file", file);
     formData.append("title", title);
 
-    const response = await fetch(`${BASE_URL}`, {
+    const response = await fetch(`${DOCUMENTS_BASE_URL}`, {
         method: "POST",
         body: formData,
         headers: {
@@ -72,18 +73,34 @@ export const uploadFile = async (file: File, title: string) => {
 };
 
 export const fetchDocuments = async () => {
-  const response = await fetch(`${BASE_URL}?t=${Date.now()}`, {
-            headers: {
-                    ...NO_CACHE_HEADERS,
-                    ...authHeaders()
-            }
-  });
-  if (!response.ok) await throwError(response, "Failed to fetch documents");
-  return response.json();
+    // Backend (SummarySphere-BackEnd) exposes a user-scoped list at:
+    //   GET /api/users/me/documents
+    // while GET /api/documents is admin-only.
+    // Try the scoped endpoint first, then fall back for older/other backends.
+    const scoped = await fetch(`${USERS_BASE_URL}/me/documents?t=${Date.now()}`, {
+        headers: {
+            ...NO_CACHE_HEADERS,
+            ...authHeaders(),
+        },
+    });
+
+    if (scoped.status !== 404) {
+        if (!scoped.ok) await throwError(scoped, "Failed to fetch documents");
+        return scoped.json();
+    }
+
+    const legacy = await fetch(`${DOCUMENTS_BASE_URL}?t=${Date.now()}`, {
+        headers: {
+            ...NO_CACHE_HEADERS,
+            ...authHeaders(),
+        },
+    });
+    if (!legacy.ok) await throwError(legacy, "Failed to fetch documents");
+    return legacy.json();
 };
 
 export const fetchDocumentById = async (id: string) => {
-  const response = await fetch(`${BASE_URL}/${id}?t=${Date.now()}`, {
+    const response = await fetch(`${DOCUMENTS_BASE_URL}/${id}?t=${Date.now()}`, {
             headers: {
                     ...NO_CACHE_HEADERS,
                     ...authHeaders()
@@ -94,7 +111,7 @@ export const fetchDocumentById = async (id: string) => {
 };
 
 export const deleteDocument = async (id: string) => {
-  const response = await fetch(`${BASE_URL}/${id}`, { 
+    const response = await fetch(`${DOCUMENTS_BASE_URL}/${id}`, { 
       method: "DELETE",
             headers: {
                     ...NO_CACHE_HEADERS,
@@ -105,7 +122,7 @@ export const deleteDocument = async (id: string) => {
 };
 
 export const downloadDocument = async (id: string, filename: string) => {
-    const response = await fetch(`${BASE_URL}/${id}/file`, {
+        const response = await fetch(`${DOCUMENTS_BASE_URL}/${id}/file`, {
             headers: {
                     ...authHeaders()
             }
@@ -127,7 +144,7 @@ export const downloadDocument = async (id: string, filename: string) => {
 };
 
 export const summarizeDocument = async (id: string, summaryType: string = "general") => {
-  const response = await fetch(`${BASE_URL}/${id}/summarize`, { 
+    const response = await fetch(`${DOCUMENTS_BASE_URL}/${id}/summarize`, { 
     method: "POST", 
     headers: {
         "Content-Type": "application/json",
@@ -174,7 +191,7 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
     const encodedType = encodeURIComponent(summaryType);
 
     const tryFallback = async (): Promise<string | null> => {
-        const fallback = await fetch(`${BASE_URL}/${id}/summary?t=${Date.now()}`, {
+        const fallback = await fetch(`${DOCUMENTS_BASE_URL}/${id}/summary?t=${Date.now()}`, {
             headers: {
                 ...NO_CACHE_HEADERS,
                 ...authHeaders(),
@@ -201,7 +218,7 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
         return null;
     }
 
-    const primary = await fetch(`${BASE_URL}/${id}/summary/${encodedType}?t=${Date.now()}`, {
+    const primary = await fetch(`${DOCUMENTS_BASE_URL}/${id}/summary/${encodedType}?t=${Date.now()}`, {
         headers: {
             ...NO_CACHE_HEADERS,
             ...authHeaders(),
