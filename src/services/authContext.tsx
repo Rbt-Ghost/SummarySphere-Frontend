@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import type { AuthSession, LoginRequest, SignupRequest } from "../types/auth";
 import { authApi } from "./authApi";
@@ -17,6 +17,41 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<AuthSession | null>(() => authStorage.get());
+
+  useEffect(() => {
+    const syncFromStorage = () => {
+      setSession(authStorage.get());
+    };
+
+    // Same-tab updates (we dispatch this from authStorage.set/clear)
+    try {
+      window.addEventListener(authStorage.eventName, syncFromStorage);
+    } catch {
+      // ignore
+    }
+
+    // Cross-tab updates
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "authSession") {
+        syncFromStorage();
+      }
+    };
+
+    try {
+      window.addEventListener("storage", onStorage);
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      try {
+        window.removeEventListener(authStorage.eventName, syncFromStorage);
+        window.removeEventListener("storage", onStorage);
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   const login = async (body: LoginRequest) => {
     const next = await authApi.login(body);

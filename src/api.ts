@@ -3,6 +3,11 @@ import { authStorage } from "./services/authStorage";
 const BASE_URL = "/api/documents"; 
 
 const throwError = async (response: Response, defaultMsg: string) => {
+    // If the token is expired/invalid, clear it so the app can re-authenticate.
+    if (response.status === 401) {
+        authStorage.clear();
+    }
+
     let errorMsg = defaultMsg;
     const text = await response.text().catch(() => "");
     
