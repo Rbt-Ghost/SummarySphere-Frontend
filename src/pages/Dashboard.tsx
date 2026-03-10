@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Sun, Moon, UserRound, ChevronDown, LogOut, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Sun, Moon, UserRound, ChevronDown, LogOut, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import CTAButton from "../components/CTAbutton";
 import Footer from "../components/Footer";
 import { useAuth } from "../services/authContext";
 import { toast } from "../components/Toast";
+import { deleteMyAccount } from "../api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isAuthenticated, session, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const [dark, setDark] = useState(() => {
     if(typeof window !== "undefined") {
@@ -79,12 +82,94 @@ export default function Dashboard() {
   };
 
   const onDeleteAccount = () => {
-    // Backend does not expose this yet.
-    toast.error("Delete account is not available yet.");
+    if (!isAuthenticated) {
+      toast.error("You must be logged in to delete your account.");
+      return;
+    }
+
+    setIsDeleteAccountOpen(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    try {
+      await deleteMyAccount();
+      setIsDeleteAccountOpen(false);
+      logout();
+      toast.success("Account deleted successfully");
+      navigate("/", { replace: true });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete account");
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
     <div className={dark ? "min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-6" : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"}>
+      <AnimatePresence>
+        {isDeleteAccountOpen ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              if (!isDeletingAccount) setIsDeleteAccountOpen(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className={
+                `w-full max-w-md rounded-2xl shadow-2xl p-6 border ` +
+                (dark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-zinc-200 text-slate-900")
+              }
+            >
+              <div className="flex items-start gap-4">
+                <div className={`p-3 rounded-full shrink-0 ${dark ? "bg-red-900/30" : "bg-red-100"}`}>
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold mb-2">Delete Account?</h3>
+                  <p className="opacity-70 text-sm leading-relaxed">
+                    This will permanently delete your account and all your documents. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsDeleteAccountOpen(false)}
+                  disabled={isDeletingAccount}
+                  className={
+                    `px-4 py-2 rounded-lg text-sm font-medium transition-colors ` +
+                    (isDeletingAccount ? "opacity-50 cursor-not-allowed" : "") +
+                    (dark ? " hover:bg-slate-700" : " hover:bg-zinc-100")
+                  }
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteAccount}
+                  disabled={isDeletingAccount}
+                  className={
+                    "px-4 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all flex items-center gap-2 " +
+                    (isDeletingAccount ? "opacity-80 cursor-not-allowed" : "")
+                  }
+                >
+                  {isDeletingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Delete Account
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       {isAuthenticated ? (
         <div className="absolute top-6 left-6" ref={profileRef}>
           <button

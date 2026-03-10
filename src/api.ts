@@ -252,3 +252,17 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
     const payload: DocumentSummaryResponse = await primary.json().catch(() => ({} as DocumentSummaryResponse));
     return extractSummaryText(payload);
 };
+
+export const deleteMyAccount = async () => {
+    const response = await fetch(`${USERS_BASE_URL}/me`, {
+        method: "DELETE",
+        headers: {
+            ...NO_CACHE_HEADERS,
+            ...authHeaders(),
+        },
+    });
+
+    if (!response.ok) {
+        await throwError(response, "Failed to delete account");
+    }
+};
