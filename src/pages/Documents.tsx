@@ -301,8 +301,8 @@ export default function Documents() {
     <div
       className={
         dark
-          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-6 pt-24 relative pb-20"
-          : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-6 pt-24 relative pb-20"
+          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center px-4 sm:px-6 pt-24 relative pb-20"
+          : "min-h-screen bg-zinc-200 text-black flex flex-col items-center px-4 sm:px-6 pt-24 relative pb-20"
       }
     >
       {/* ToastProvider is in App.tsx */}
@@ -413,20 +413,20 @@ export default function Documents() {
                     exit={{ opacity: 0, scale: 0.95 }}
 
                     className={`
-                    group relative flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border transition-all
+                    group relative flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border transition-all overflow-hidden
                     ${dark
                         ? "bg-slate-800 border-slate-700 hover:border-slate-600"
                         : "bg-white border-zinc-200 shadow-sm hover:border-zinc-300"
                       }
                   `}
                   >
-                    <div className="flex items-start gap-4 mb-4 md:mb-0">
+                    <div className="flex items-start gap-4 mb-4 md:mb-0 min-w-0">
                       <div className={`p-3 rounded-lg ${dark ? 'bg-slate-700' : 'bg-zinc-100'}`}>
                         <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h3
-                          className="font-semibold truncate max-w-[200px] sm:max-w-xs"
+                          className="font-semibold truncate"
                           title={doc.title || doc.fileName}
                         >
                           {doc.title || doc.fileName}
@@ -445,7 +445,7 @@ export default function Documents() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 justify-between md:justify-end w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 justify-between md:justify-end w-full md:w-auto min-w-0">
                       <div className={`
                             px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5
                             ${isProcessing
@@ -463,7 +463,7 @@ export default function Documents() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
                         <select
                           aria-label="Summary type"
                           value={selectedType}
@@ -471,6 +471,7 @@ export default function Documents() {
                           disabled={doc.status === "PROCESSING"}
                           className={`
                               h-9 px-2 rounded-lg text-xs font-medium border transition-colors
+                              w-full sm:w-auto
                               ${doc.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
                               ${dark
                               ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
@@ -519,7 +520,7 @@ export default function Documents() {
                           <Download className="w-4 h-4" />
                         </button>
 
-                        <div className={`w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
+                        <div className={`hidden sm:block w-px h-6 mx-1 ${dark ? 'bg-slate-700' : 'bg-zinc-200'}`}></div>
 
                         <button
                           onClick={() => handleDeleteClick(doc.id)}
