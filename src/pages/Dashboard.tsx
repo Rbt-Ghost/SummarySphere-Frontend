@@ -168,7 +168,7 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="text-5xl font-bold tracking-tight mb-10"
+        className="text-center text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-10"
       >
         Summary Sphere
       </motion.h1>
