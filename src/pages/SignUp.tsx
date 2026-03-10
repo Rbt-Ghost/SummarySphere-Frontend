@@ -97,8 +97,8 @@ export default function SignUp() {
     <div
       className={
         dark
-          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-6"
-          : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"
+          ? "min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-6 relative pb-20"
+          : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6 relative pb-20"
       }
     >
       <button
