@@ -7,9 +7,10 @@ type Props = {
 	children?: React.ReactNode;
     size?: "small" | "medium" | "large";
     disabled?: boolean; // Added this property
+	className?: string;
 };
 
-export default function CTAButton({ dark = true, onClick, children, size = "large", disabled = false }: Props) {
+export default function CTAButton({ dark = true, onClick, children, size = "large", disabled = false, className = "" }: Props) {
     // Define styles for each size
     const sizeStyles = {
         small: "px-4 py-2 text-sm rounded-lg",
@@ -29,6 +30,7 @@ export default function CTAButton({ dark = true, onClick, children, size = "larg
                 ${dark ? "bg-neutral-100 text-black" : "bg-neutral-900 text-white"} 
                 shadow-2xl font-semibold flex items-center gap-2
                 ${disabled ? "opacity-50 cursor-not-allowed" : "hover:scale-105 transition-transform cursor-pointer"}
+				${className}
             `}
 		>
 			{children ?? "Button"}

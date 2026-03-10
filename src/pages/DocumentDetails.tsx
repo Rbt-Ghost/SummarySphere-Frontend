@@ -305,13 +305,13 @@ export default function DocumentDetail() {
         <div className="lg:col-span-2">
           <div className={`h-full min-h-[500px] p-8 rounded-2xl border flex flex-col ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-zinc-200'}`}>
             
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-purple-500" />
                 Document Summary
               </h2>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
                 <select
                   aria-label="Summary type"
                   value={summaryType}
@@ -319,6 +319,7 @@ export default function DocumentDetail() {
                   disabled={documentMeta.status === "PROCESSING"}
                   className={`
                     h-9 px-2 rounded-lg text-xs font-medium border transition-colors
+                    w-full sm:w-auto
                     ${documentMeta.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
                     ${dark
                       ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
@@ -338,6 +339,7 @@ export default function DocumentDetail() {
                     size="small"
                     onClick={handleSummarize}
                     disabled={isSummarizing || documentMeta.status === "PROCESSING"}
+                    className="w-full sm:w-auto"
                   >
                     {isSummarizing ? (
                       <>
