@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
-import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary } from "../api";
+import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary, fetchDocumentSummaries } from "../api";
 import { toast } from "../components/Toast"; // Removed Provider import
 
 interface DocDetail {
@@ -24,6 +24,8 @@ interface DocDetail {
 }
 
 type SummaryType = "detailed" | "concise" | "bullet-points";
+
+const SUMMARY_TYPES: SummaryType[] = ["detailed", "concise", "bullet-points"];
 
 const isValidSummaryType = (value: string | null): value is SummaryType => {
   return value === "detailed" || value === "concise" || value === "bullet-points";
@@ -58,6 +60,8 @@ export default function DocumentDetail() {
   const [summaryType, setSummaryType] = useState<SummaryType>("detailed");
   const [isSummaryTypeInitialized, setIsSummaryTypeInitialized] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [serverSummariesByType, setServerSummariesByType] = useState<Partial<Record<SummaryType, string>>>({});
+  const [serverSummaryTypesKnown, setServerSummaryTypesKnown] = useState(false);
 
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -127,6 +131,60 @@ export default function DocumentDetail() {
 
     (async () => {
       try {
+        let known = serverSummaryTypesKnown;
+        let summariesByType = serverSummariesByType;
+
+        // Prefer fetching the full list once (avoids 404s when a type doesn't exist).
+        if (!known) {
+          const all = await fetchDocumentSummaries(id);
+          if (cancelled) return;
+
+          if (all !== null) {
+            const next: Partial<Record<SummaryType, string>> = {};
+            for (const item of all) {
+              const t = typeof item.summaryType === "string" ? item.summaryType : "";
+              const text = typeof item.summaryText === "string" ? item.summaryText : "";
+              if (!t || !text) continue;
+              if (!isValidSummaryType(t)) continue;
+              next[t] = text;
+            }
+
+            setServerSummariesByType(next);
+            setServerSummaryTypesKnown(true);
+            known = true;
+            summariesByType = next;
+
+            // Cache server summaries locally for instant switching.
+            try {
+              for (const t of SUMMARY_TYPES) {
+                const text = next[t];
+                if (text) {
+                  localStorage.setItem(summaryStorageKey(id, t), text);
+                  localStorage.setItem(lastSummarizedTypeKey(id), t);
+                }
+              }
+            } catch {
+              // ignore
+            }
+
+            const fromServer = summariesByType[summaryType];
+            setSummary(fromServer ?? null);
+            return;
+          }
+        }
+
+        // If we know the server summaries, don't hit per-type endpoint for missing types.
+        if (known) {
+          const fromServer = summariesByType[summaryType];
+          if (fromServer) {
+            setSummary(fromServer);
+            return;
+          }
+          // Known absent -> show empty state without making a request.
+          setSummary(null);
+          return;
+        }
+
         const existing = await fetchDocumentSummary(id, summaryType);
         if (cancelled) return;
         if (existing) {
@@ -154,7 +212,7 @@ export default function DocumentDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, summaryType, isSummaryTypeInitialized]);
+  }, [id, summaryType, isSummaryTypeInitialized, serverSummaryTypesKnown, serverSummariesByType]);
 
   const handleSummarize = async () => {
     if (!id || !documentMeta) return;
@@ -174,6 +232,11 @@ export default function DocumentDetail() {
         } catch {
           // ignore
         }
+
+        // Keep the in-memory server map in sync so switching types is instant.
+        setServerSummariesByType((prev) => ({ ...prev, [summaryType]: data.message }));
+        setServerSummaryTypesKnown(true);
+
         setDocumentMeta({ ...documentMeta, status: "COMPLETED" });
         toast.success("Summary generated successfully!"); 
       }

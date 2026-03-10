@@ -17,7 +17,7 @@ import { useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
-import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument, fetchDocumentSummary } from "../api";
+import { fetchDocuments, deleteDocument, summarizeDocument, downloadDocument, fetchDocumentSummary, fetchDocumentSummaries } from "../api";
 import { toast } from "../components/Toast";
 
 interface Doc {
@@ -135,32 +135,72 @@ export default function Documents() {
 
     let cancelled = false;
 
-    const probe = async (docId: string, summaryType: SummaryType) => {
-      const inFlightKey = `${docId}:${summaryType}`;
+    const probeDoc = async (docId: string, selectedType: SummaryType) => {
+      // One probe per doc (not per type) to avoid 404 noise.
+      const inFlightKey = `${docId}`;
       if (summaryProbeInFlight.current.has(inFlightKey)) return;
       summaryProbeInFlight.current.add(inFlightKey);
 
       try {
-        const summaryText = await fetchDocumentSummary(docId, summaryType);
+        // Prefer the list endpoint if backend supports it.
+        const all = await fetchDocumentSummaries(docId);
+        if (cancelled) return;
+
+        if (all !== null) {
+          const availableByType: Partial<Record<SummaryType, boolean>> = {};
+
+          for (const item of all) {
+            const t = typeof item.summaryType === "string" ? item.summaryType : "";
+            const text = typeof item.summaryText === "string" ? item.summaryText : "";
+            if (!t || !text) continue;
+            if (t === "detailed" || t === "concise" || t === "bullet-points") {
+              availableByType[t] = true;
+              try {
+                localStorage.setItem(summaryStorageKey(docId, t), text);
+                localStorage.setItem(lastSummarizedTypeKey(docId), t);
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          // Mark missing types explicitly as false so UI doesn't keep probing.
+          for (const t of SUMMARY_TYPES) {
+            if (availableByType[t] !== true) availableByType[t] = false;
+          }
+
+          setServerSummaryAvailable((prev) => ({
+            ...prev,
+            [docId]: {
+              ...(prev[docId] || {}),
+              ...availableByType,
+            },
+          }));
+
+          return;
+        }
+
+        // Fallback for older backends (no /summaries): probe just the currently selected type.
+        const summaryText = await fetchDocumentSummary(docId, selectedType);
         if (cancelled) return;
         const available = Boolean(summaryText && summaryText.trim());
 
         setServerSummaryAvailable((prev) => {
           const existingForDoc = prev[docId] || {};
-          if (existingForDoc[summaryType] === available) return prev;
+          if (existingForDoc[selectedType] === available) return prev;
           return {
             ...prev,
             [docId]: {
               ...existingForDoc,
-              [summaryType]: available,
+              [selectedType]: available,
             },
           };
         });
 
         if (available && summaryText) {
           try {
-            localStorage.setItem(summaryStorageKey(docId, summaryType), summaryText);
-            localStorage.setItem(lastSummarizedTypeKey(docId), summaryType);
+            localStorage.setItem(summaryStorageKey(docId, selectedType), summaryText);
+            localStorage.setItem(lastSummarizedTypeKey(docId), selectedType);
           } catch {
             // ignore
           }
@@ -169,12 +209,12 @@ export default function Documents() {
         if (cancelled) return;
         setServerSummaryAvailable((prev) => {
           const existingForDoc = prev[docId] || {};
-          if (existingForDoc[summaryType] === false) return prev;
+          if (existingForDoc[selectedType] === false) return prev;
           return {
             ...prev,
             [docId]: {
               ...existingForDoc,
-              [summaryType]: false,
+              [selectedType]: false,
             },
           };
         });
@@ -193,7 +233,7 @@ export default function Documents() {
       const alreadyProbed = serverSummaryAvailable[doc.id]?.[selectedType] !== undefined;
       if (alreadyProbed) continue;
 
-      void probe(doc.id, selectedType);
+      void probeDoc(doc.id, selectedType);
     }
 
     return () => {
