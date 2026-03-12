@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowLeft, Check, UserPlus, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import Footer from "../components/Footer";
@@ -41,11 +41,24 @@ export default function SignUp() {
     return state?.from?.pathname || "/";
   }, [location.state]);
 
+  const rules = [
+    { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+    { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
+    { label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
+    { label: "One number", test: (p: string) => /\d/.test(p) },
+    { label: "One special character (!@#$…)", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  ];
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  const ruleResults = useMemo(() => rules.map((r) => r.test(password)), [password]);
+  const allRulesPassed = ruleResults.every(Boolean);
+  const passwordsMatch = password === confirmPassword;
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -66,12 +79,12 @@ export default function SignUp() {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!allRulesPassed) {
+      toast.error("Password does not meet the requirements");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!passwordsMatch) {
       toast.error("Passwords do not match");
       return;
     }
@@ -168,15 +181,32 @@ export default function SignUp() {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); }}
               autoComplete="new-password"
               className={
                 dark
                   ? "w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 text-white outline-none focus:border-blue-500"
                   : "w-full px-4 py-3 rounded-xl border border-zinc-300 bg-white text-black outline-none focus:border-blue-500"
               }
-              placeholder="At least 6 characters"
+              placeholder="••••••••"
             />
+
+            {passwordTouched && password.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {rules.map((rule, i) => (
+                  <li key={rule.label} className="flex items-center gap-2 text-xs">
+                    {ruleResults[i] ? (
+                      <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    ) : (
+                      <X className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                    )}
+                    <span className={ruleResults[i] ? "text-green-500" : dark ? "text-slate-400" : "text-zinc-500"}>
+                      {rule.label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div>
@@ -195,6 +225,9 @@ export default function SignUp() {
               }
               placeholder="Repeat password"
             />
+            {confirmPassword.length > 0 && !passwordsMatch && (
+              <p className="mt-1.5 text-xs text-red-500">Passwords do not match</p>
+            )}
           </div>
 
           <button

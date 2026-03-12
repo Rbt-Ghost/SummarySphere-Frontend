@@ -136,4 +136,18 @@ export const authApi = {
       }
     );
   },
+
+  async forgotPassword(email: string): Promise<void> {
+    const response = await postJson(`${AUTH_BASE_URL}/forgot-password`, { email });
+    if (!response.ok) {
+      await throwError(response, "Failed to send password reset email");
+    }
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const response = await postJson(`${AUTH_BASE_URL}/reset-password`, { token, newPassword });
+    if (!response.ok) {
+      await throwError(response, "Failed to reset password");
+    }
+  },
 };

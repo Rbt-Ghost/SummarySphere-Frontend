@@ -11,6 +11,8 @@ const Documents = lazy(() => import("./pages/Documents.tsx"));
 const DocumentDetails = lazy(() => import("./pages/DocumentDetails.tsx"));
 const Login = lazy(() => import("./pages/Login.tsx"));
 const SignUp = lazy(() => import("./pages/SignUp.tsx"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword.tsx"));
 
 export default function App() {
   const [dark] = useState(() => {
@@ -33,6 +35,8 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route element={<RequireAuth />}>
           <Route path="/upload" element={<Upload />} />
