@@ -122,25 +122,51 @@ export const deleteDocument = async (id: string) => {
 };
 
 export const downloadDocument = async (id: string, filename: string) => {
-        const response = await fetch(`${DOCUMENTS_BASE_URL}/${id}/file`, {
-            headers: {
-                    ...authHeaders()
-            }
+    const linkResponse = await fetch(`${DOCUMENTS_BASE_URL}/${id}/download-link`, {
+        headers: {
+            ...NO_CACHE_HEADERS,
+            ...authHeaders(),
+        },
     });
-  
-  if (!response.ok) {
-      await throwError(response, "Failed to download file");
-  }
 
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename; 
-  document.body.appendChild(a);
-  a.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(a);
+    if (linkResponse.ok) {
+        const payload = await linkResponse.json().catch(() => null) as { downloadUrl?: unknown } | null;
+        const downloadUrl = typeof payload?.downloadUrl === "string" ? payload.downloadUrl : "";
+
+        if (downloadUrl) {
+            const a = document.createElement("a");
+            a.href = downloadUrl;
+            a.download = filename;
+            a.rel = "noopener noreferrer";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            return;
+        }
+    } else if (linkResponse.status !== 404 && linkResponse.status !== 405) {
+        await throwError(linkResponse, "Failed to get download link");
+    }
+
+    // Fallback for older backend implementations.
+    const fileResponse = await fetch(`${DOCUMENTS_BASE_URL}/${id}/file`, {
+        headers: {
+            ...authHeaders(),
+        },
+    });
+
+    if (!fileResponse.ok) {
+        await throwError(fileResponse, "Failed to download file");
+    }
+
+    const blob = await fileResponse.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
 };
 
 export const summarizeDocument = async (id: string, summaryType: string = "general") => {
