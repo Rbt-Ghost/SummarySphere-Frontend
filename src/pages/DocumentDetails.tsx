@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { jsPDF } from "jspdf";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -45,6 +46,25 @@ const summaryStorageKey = (docId: string, summaryType: SummaryType) => {
 
 const lastSummarizedTypeKey = (docId: string) => {
   return `lastSummarizedType-${docId}`;
+};
+
+const summaryTypeLabel = (t: SummaryType) => {
+  switch (t) {
+    case "detailed":
+      return "Detailed";
+    case "concise":
+      return "Concise";
+    case "bullet-points":
+      return "Bullet points";
+  }
+};
+
+const safeFilenamePart = (value: string) => {
+  return value
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
 };
 
 export default function DocumentDetail() {
@@ -274,6 +294,65 @@ export default function DocumentDetail() {
     }
   };
 
+  const handleDownloadSummaryPdf = () => {
+    if (!documentMeta) return;
+
+    const text = summary?.trim() ?? "";
+    if (!text) {
+      toast.error("No summary available for this type yet.");
+      return;
+    }
+
+    try {
+      const pdf = new jsPDF({ unit: "pt", format: "a4" });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 48;
+      const maxWidth = pageWidth - margin * 2;
+
+      const title = documentMeta.title || documentMeta.fileName;
+      const subtitle = `${summaryTypeLabel(summaryType)} summary`;
+
+      let y = margin;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      const titleLines = pdf.splitTextToSize(title, maxWidth);
+      pdf.text(titleLines, margin, y);
+      y += titleLines.length * 20;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text(subtitle, margin, y);
+      y += 18;
+
+      pdf.setFontSize(9);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+      y += 22;
+
+      pdf.setFontSize(11);
+      const lines = pdf.splitTextToSize(text, maxWidth);
+      const lineHeight = 14;
+
+      for (const line of lines) {
+        if (y + lineHeight > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+        pdf.text(line, margin, y);
+        y += lineHeight;
+      }
+
+      const base = safeFilenamePart(title) || "summary";
+      const typePart = safeFilenamePart(summaryType);
+      const filename = `${base}-${typePart}-summary.pdf`;
+      pdf.save(filename);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create PDF");
+    }
+  };
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${dark ? 'bg-slate-900 text-white' : 'bg-zinc-200 text-black'}`}>
@@ -359,6 +438,17 @@ export default function DocumentDetail() {
                 `}
               >
                 <Download className="w-4 h-4" /> Download File
+              </button>
+
+              <button 
+                onClick={handleDownloadSummaryPdf}
+                disabled={!summary || isLoadingSummary || isSummarizing}
+                className={`w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors
+                  ${dark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-zinc-100 hover:bg-zinc-200'}
+                  ${(!summary || isLoadingSummary || isSummarizing) ? 'opacity-50 cursor-not-allowed hover:bg-inherit' : ''}
+                `}
+              >
+                <Download className="w-4 h-4" /> Download Summary
               </button>
             </div>
           </div>
