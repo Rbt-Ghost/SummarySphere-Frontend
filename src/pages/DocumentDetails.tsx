@@ -443,12 +443,15 @@ export default function DocumentDetail() {
               <button 
                 onClick={handleDownloadSummaryPdf}
                 disabled={!summary || isLoadingSummary || isSummarizing}
-                className={`w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors
-                  ${dark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-zinc-100 hover:bg-zinc-200'}
-                  ${(!summary || isLoadingSummary || isSummarizing) ? 'opacity-50 cursor-not-allowed hover:bg-inherit' : ''}
+                className={`w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors border
+                  ${dark
+                    ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border-purple-500/20'
+                    : 'bg-purple-600/10 hover:bg-purple-600/15 text-purple-700 border-purple-600/20'
+                  }
+                  ${(!summary || isLoadingSummary || isSummarizing) ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}
                 `}
               >
-                <Download className="w-4 h-4" /> Download Summary
+                <FileText className="w-4 h-4" /> Download Summary
               </button>
             </div>
           </div>
