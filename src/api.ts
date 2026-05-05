@@ -307,6 +307,41 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
     return await tryFallback();
 };
 
+export type ChatRole = "USER" | "ASSISTANT";
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+  createdAt: string;
+}
+
+export const fetchChatHistory = async (documentId: string): Promise<ChatMessage[]> => {
+  const response = await fetch(`${DOCUMENTS_BASE_URL}/${documentId}/chat?t=${Date.now()}`, {
+    headers: { ...NO_CACHE_HEADERS, ...authHeaders() },
+  });
+  if (!response.ok) await throwError(response, "Failed to load chat history");
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+};
+
+export const sendChatMessage = async (documentId: string, message: string): Promise<ChatMessage> => {
+  const response = await fetch(`${DOCUMENTS_BASE_URL}/${documentId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...NO_CACHE_HEADERS, ...authHeaders() },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) await throwError(response, "Failed to send message");
+  return response.json();
+};
+
+export const clearChatHistory = async (documentId: string): Promise<void> => {
+  const response = await fetch(`${DOCUMENTS_BASE_URL}/${documentId}/chat`, {
+    method: "DELETE",
+    headers: { ...NO_CACHE_HEADERS, ...authHeaders() },
+  });
+  if (!response.ok) await throwError(response, "Failed to clear chat history");
+};
+
 export const deleteMyAccount = async () => {
     const response = await fetch(`${USERS_BASE_URL}/me`, {
         method: "DELETE",

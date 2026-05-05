@@ -1,18 +1,23 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  FileText, 
-  Download, 
-  Sparkles, 
-  Loader2, 
-  AlertCircle
+import {
+  ArrowLeft,
+  Calendar,
+  FileText,
+  Download,
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  MessageCircle,
+  Send,
+  Trash2,
+  Bot,
 } from "lucide-react";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
-import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary, fetchDocumentSummaries } from "../api";
+import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary, fetchDocumentSummaries, fetchChatHistory, sendChatMessage, clearChatHistory } from "../api";
+import type { ChatMessage } from "../api";
 import { toast } from "../components/Toast"; // Removed Provider import
 
 interface DocDetail {
@@ -82,6 +87,14 @@ export default function DocumentDetail() {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [serverSummariesByType, setServerSummariesByType] = useState<Partial<Record<SummaryType, string>>>({});
   const [serverSummaryTypesKnown, setServerSummaryTypesKnown] = useState(false);
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isClearingChat, setIsClearingChat] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [dark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -353,6 +366,64 @@ export default function DocumentDetail() {
     }
   };
 
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setIsChatLoading(true);
+    fetchChatHistory(id)
+      .then((msgs) => { if (!cancelled) setChatMessages(msgs); })
+      .catch(() => { /* silently ignore if chat endpoint not yet available */ })
+      .finally(() => { if (!cancelled) setIsChatLoading(false); });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, isSendingMessage]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || !id || isSendingMessage) return;
+
+    const optimistic: ChatMessage = { role: "USER", content: text, createdAt: new Date().toISOString() };
+    setChatMessages((prev) => [...prev, optimistic]);
+    setChatInput("");
+    setIsSendingMessage(true);
+
+    try {
+      const reply = await sendChatMessage(id, text);
+      setChatMessages((prev) => [...prev, reply]);
+    } catch (err) {
+      setChatMessages((prev) => prev.filter((m) => m !== optimistic));
+      toast.error(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  const handleClearChat = async () => {
+    if (!id || isClearingChat || chatMessages.length === 0) return;
+    setIsClearingChat(true);
+    try {
+      await clearChatHistory(id);
+      setChatMessages([]);
+      toast.success("Chat history cleared");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear chat history");
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
+
+  const formatChatTime = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${dark ? 'bg-slate-900 text-white' : 'bg-zinc-200 text-black'}`}>
@@ -536,6 +607,150 @@ export default function DocumentDetail() {
       </div>
 
       <Footer dark={dark} />
+
+      {/* Floating chat bubble */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+
+        {/* Chat panel */}
+        {isChatOpen && (
+          <div className={`w-[360px] sm:w-[400px] h-[520px] rounded-2xl border shadow-2xl flex flex-col overflow-hidden
+            ${dark ? "bg-slate-800 border-slate-700" : "bg-white border-zinc-200"}
+          `}>
+            {/* Header */}
+            <div className={`flex items-center justify-between px-4 py-3 border-b ${dark ? "border-slate-700" : "border-zinc-200"}`}>
+              <h2 className="font-bold flex items-center gap-2 text-sm">
+                <Bot className="w-4 h-4 text-blue-500" />
+                Document Chat
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClearChat}
+                  disabled={chatMessages.length === 0 || isClearingChat}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors
+                    ${chatMessages.length === 0 || isClearingChat ? "opacity-30 cursor-not-allowed" : ""}
+                    ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}
+                  `}
+                >
+                  {isClearingChat ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Clear
+                </button>
+                <button
+                  onClick={() => setIsChatOpen(false)}
+                  className={`p-1 rounded-lg transition-colors ${dark ? "hover:bg-slate-700" : "hover:bg-zinc-100"}`}
+                  aria-label="Close chat"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 4L4 12M4 4l8 8" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+              {isChatLoading ? (
+                <div className="flex-1 flex items-center justify-center opacity-40">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : chatMessages.length === 0 && !isSendingMessage ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-40 text-center">
+                  <MessageCircle className="w-8 h-8" />
+                  <p className="text-xs">No messages yet. Ask anything about this document.</p>
+                </div>
+              ) : (
+                <>
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`flex gap-2 ${msg.role === "USER" ? "justify-end" : "justify-start"}`}>
+                      {msg.role === "ASSISTANT" && (
+                        <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5 ${dark ? "bg-blue-500/20" : "bg-blue-100"}`}>
+                          <Bot className="w-3.5 h-3.5 text-blue-500" />
+                        </div>
+                      )}
+                      <div className={`max-w-[78%] flex flex-col gap-0.5 ${msg.role === "USER" ? "items-end" : "items-start"}`}>
+                        <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap
+                          ${msg.role === "USER"
+                            ? dark ? "bg-blue-600 text-white rounded-br-sm" : "bg-blue-500 text-white rounded-br-sm"
+                            : dark ? "bg-slate-700 text-white rounded-bl-sm" : "bg-zinc-100 text-slate-900 rounded-bl-sm"
+                          }
+                        `}>
+                          {msg.content}
+                        </div>
+                        <span className="text-[10px] opacity-40 px-1">{formatChatTime(msg.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {isSendingMessage && (
+                    <div className="flex gap-2 justify-start">
+                      <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5 ${dark ? "bg-blue-500/20" : "bg-blue-100"}`}>
+                        <Bot className="w-3.5 h-3.5 text-blue-500" />
+                      </div>
+                      <div className={`px-3 py-2.5 rounded-2xl rounded-bl-sm ${dark ? "bg-slate-700" : "bg-zinc-100"}`}>
+                        <div className="flex gap-1 items-center h-4">
+                          <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${dark ? "bg-slate-400" : "bg-zinc-400"}`} style={{ animationDelay: "0ms" }} />
+                          <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${dark ? "bg-slate-400" : "bg-zinc-400"}`} style={{ animationDelay: "150ms" }} />
+                          <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${dark ? "bg-slate-400" : "bg-zinc-400"}`} style={{ animationDelay: "300ms" }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className={`px-4 py-3 border-t ${dark ? "border-slate-700" : "border-zinc-200"}`}>
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask about this document…"
+                  disabled={isSendingMessage}
+                  className={`flex-1 px-3 py-2 rounded-xl text-sm border transition-colors outline-none
+                    ${isSendingMessage ? "opacity-50 cursor-not-allowed" : ""}
+                    ${dark
+                      ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500"
+                      : "bg-zinc-50 border-zinc-200 text-slate-900 placeholder-zinc-400 focus:border-blue-400"
+                    }
+                  `}
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isSendingMessage}
+                  className={`px-3 py-2 rounded-xl flex items-center justify-center transition-all
+                    ${!chatInput.trim() || isSendingMessage ? "opacity-40 cursor-not-allowed" : "hover:scale-105 cursor-pointer"}
+                    ${dark ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}
+                  `}
+                >
+                  {isSendingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Bubble toggle button */}
+        <button
+          onClick={() => setIsChatOpen((o) => !o)}
+          className={`relative w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95
+            ${dark ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}
+          `}
+          aria-label="Toggle chat"
+        >
+          {isChatOpen
+            ? <svg className="w-5 h-5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 4L4 12M4 4l8 8" strokeLinecap="round" /></svg>
+            : <MessageCircle className="w-6 h-6" />
+          }
+          {!isChatOpen && chatMessages.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+              {chatMessages.length > 99 ? "99+" : chatMessages.length}
+            </span>
+          )}
+        </button>
+
+      </div>
     </div>
   );
 }
