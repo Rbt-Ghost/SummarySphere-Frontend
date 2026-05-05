@@ -460,7 +460,10 @@ export default function Documents() {
                       }
                   `}
                   >
-                    <div className="flex items-start gap-4 mb-4 md:mb-0 min-w-0">
+                    <button
+                      onClick={() => navigate(`/documents/${doc.id}${hasSelectedSummary ? `?summaryType=${encodeURIComponent(selectedType)}` : ""}`)}
+                      className="flex items-start gap-4 mb-4 md:mb-0 min-w-0 text-left hover:opacity-80 transition-opacity"
+                    >
                       <div className={`p-3 rounded-lg ${dark ? 'bg-slate-700' : 'bg-zinc-100'}`}>
                         <FileText className={`w-6 h-6 ${dark ? 'text-blue-400' : 'text-blue-600'}`} />
                       </div>
@@ -483,7 +486,7 @@ export default function Documents() {
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </button>
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 justify-between md:justify-end w-full md:w-auto min-w-0">
                       <div className={`
