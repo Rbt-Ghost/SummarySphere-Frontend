@@ -82,6 +82,38 @@ const postJson = async (url: string, body: unknown) => {
   });
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const postJsonWithRetry = async (
+  url: string,
+  body: unknown,
+  maxRetries = 2
+): Promise<Response> => {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const response = await postJson(url, body);
+      if (![502, 503, 504].includes(response.status) || attempt === maxRetries) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxRetries) {
+        throw error;
+      }
+    }
+
+    await sleep(500 * (attempt + 1));
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error("Request failed");
+};
+
 const tryPost = async <T>(
   urls: string[],
   body: unknown,
@@ -91,7 +123,7 @@ const tryPost = async <T>(
   let lastResponse: Response | null = null;
 
   for (const url of urls) {
-    const response = await postJson(url, body);
+    const response = await postJsonWithRetry(url, body);
     lastResponse = response;
 
     // If route not found, try next common path.
@@ -138,14 +170,14 @@ export const authApi = {
   },
 
   async forgotPassword(email: string): Promise<void> {
-    const response = await postJson(`${AUTH_BASE_URL}/forgot-password`, { email });
+    const response = await postJsonWithRetry(`${AUTH_BASE_URL}/forgot-password`, { email });
     if (!response.ok) {
       await throwError(response, "Failed to send password reset email");
     }
   },
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const response = await postJson(`${AUTH_BASE_URL}/reset-password`, { token, newPassword });
+    const response = await postJsonWithRetry(`${AUTH_BASE_URL}/reset-password`, { token, newPassword });
     if (!response.ok) {
       await throwError(response, "Failed to reset password");
     }
