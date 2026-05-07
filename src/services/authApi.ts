@@ -1,6 +1,7 @@
 import type { AuthSession, LoginRequest, SignupRequest } from "../types/auth";
 
 const AUTH_BASE_URL = (import.meta.env.VITE_AUTH_BASE_URL as string | undefined) ?? "/api/auth";
+const AUTH_REQUEST_TIMEOUT_MS = 8000;
 
 const throwError = async (response: Response, defaultMsg: string) => {
   let errorMsg = defaultMsg;
@@ -76,7 +77,7 @@ const safeJson = async (response: Response): Promise<unknown> => {
 
 const postJson = async (url: string, body: unknown) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
 
   try {
     return await fetch(url, {
@@ -100,7 +101,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const postJsonWithRetry = async (
   url: string,
   body: unknown,
-  maxRetries = 2
+  maxRetries = 1
 ): Promise<Response> => {
   let lastError: unknown = null;
 
