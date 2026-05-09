@@ -9,6 +9,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'https://bcbeno.me', 
+        // For local development, you can use the following line instead:
+        //target: 'http://localhost:8080',
         changeOrigin: true,
       },
     },
