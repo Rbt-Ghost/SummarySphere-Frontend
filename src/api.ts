@@ -180,6 +180,13 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
     body: JSON.stringify({ summaryType }) 
   });
   
+  if (response.status === 409) {
+    const existing = await fetchDocumentSummary(id, summaryType);
+    if (existing) {
+      return { summaryText: existing, message: existing, summaryType };
+    }
+  }
+  
   if (!response.ok) {
     await throwError(response, "Failed to summarize document");
   }
