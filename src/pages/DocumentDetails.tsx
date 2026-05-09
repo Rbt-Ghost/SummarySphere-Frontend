@@ -204,6 +204,32 @@ export default function DocumentDetail() {
             setSummary(fromServer ?? null);
             return;
           }
+
+          // Fallback for older backends: probe all types to ensure cross-device sync works.
+          // This ensures summaries created on one device are discovered on another.
+          const next: Partial<Record<SummaryType, string>> = {};
+          for (const t of SUMMARY_TYPES) {
+            if (cancelled) return;
+            const text = await fetchDocumentSummary(id, t);
+            if (text && text.trim()) {
+              next[t] = text;
+              try {
+                localStorage.setItem(summaryStorageKey(id, t), text);
+                localStorage.setItem(lastSummarizedTypeKey(id), t);
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          setServerSummariesByType(next);
+          setServerSummaryTypesKnown(true);
+          known = true;
+          summariesByType = next;
+
+          const fromServer = summariesByType[summaryType];
+          setSummary(fromServer ?? null);
+          return;
         }
 
         // If we know the server summaries, don't hit per-type endpoint for missing types.

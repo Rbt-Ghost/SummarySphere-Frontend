@@ -275,7 +275,13 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
                 await throwError(primary, "Failed to fetch document summary");
             }
 
-            // Non-auth errors: treat as "no summary" to avoid breaking the UI.
+            // For 5xx errors, don't mark endpoint as bad - the summary might not exist yet
+            // or the server might be temporarily unavailable. Return null to try fallback.
+            if (primary.status >= 500 && primary.status < 600) {
+                return null;
+            }
+
+            // Other non-auth errors: treat as "no summary" to avoid breaking the UI.
             return null;
         }
 

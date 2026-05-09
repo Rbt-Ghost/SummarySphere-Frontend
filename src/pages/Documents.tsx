@@ -111,6 +111,86 @@ export default function Documents() {
     loadDocs();
   }, []);
 
+  // Aggressive initial probe: fetch all summary types for every completed document
+  // This runs once after documents are loaded to ensure summaries created on
+  // other devices are discovered immediately.
+  useEffect(() => {
+    if (documents.length === 0) return;
+
+    let cancelled = false;
+
+    const probeAll = async () => {
+      for (const doc of documents) {
+        if (cancelled) return;
+        if (doc.status !== "COMPLETED") continue;
+
+        try {
+          const all = await fetchDocumentSummaries(doc.id);
+          if (cancelled) return;
+
+          if (all !== null) {
+            const availableByType: Partial<Record<SummaryType, boolean>> = {};
+            for (const t of SUMMARY_TYPES) availableByType[t] = false;
+
+            for (const item of all) {
+              const t = typeof item.summaryType === "string" ? item.summaryType : "";
+              const text = typeof item.summaryText === "string" ? item.summaryText : "";
+              if (!t || !text) continue;
+              if (t === "detailed" || t === "concise" || t === "bullet-points") {
+                availableByType[t] = true;
+                try {
+                  localStorage.setItem(summaryStorageKey(doc.id, t), text);
+                  localStorage.setItem(lastSummarizedTypeKey(doc.id), t);
+                } catch {
+                  // ignore
+                }
+              }
+            }
+
+            setServerSummaryAvailable((prev) => ({
+              ...prev,
+              [doc.id]: {
+                ...(prev[doc.id] || {}),
+                ...availableByType,
+              },
+            }));
+            continue;
+          }
+
+          // Fallback: probe all types individually.
+          const availableByType: Partial<Record<SummaryType, boolean>> = {};
+          for (const t of SUMMARY_TYPES) {
+            const text = await fetchDocumentSummary(doc.id, t);
+            const available = Boolean(text && text.trim());
+            availableByType[t] = available;
+            if (available && text) {
+              try {
+                localStorage.setItem(summaryStorageKey(doc.id, t), text);
+                localStorage.setItem(lastSummarizedTypeKey(doc.id), t);
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          setServerSummaryAvailable((prev) => ({
+            ...prev,
+            [doc.id]: {
+              ...(prev[doc.id] || {}),
+              ...availableByType,
+            },
+          }));
+        } catch {
+          // ignore per-doc errors
+        }
+      }
+    };
+
+    void probeAll();
+
+    return () => { cancelled = true; };
+  }, [documents]);
+
   useEffect(() => {
     if (documents.length === 0) return;
 
@@ -180,33 +260,41 @@ export default function Documents() {
           return;
         }
 
-        // Fallback for older backends (no /summaries): probe just the currently selected type.
-        const summaryText = await fetchDocumentSummary(docId, selectedType);
-        if (cancelled) return;
-        const available = Boolean(summaryText && summaryText.trim());
+        // Fallback for older backends (no /summaries): probe ALL types, not just selected.
+        // This ensures cross-device sync works when the /summaries endpoint fails.
+        const availableByType: Partial<Record<SummaryType, boolean>> = {};
+
+        for (const summaryType of SUMMARY_TYPES) {
+          if (cancelled) return;
+          const summaryText = await fetchDocumentSummary(docId, summaryType);
+          const available = Boolean(summaryText && summaryText.trim());
+          availableByType[summaryType] = available;
+
+          if (available && summaryText) {
+            try {
+              localStorage.setItem(summaryStorageKey(docId, summaryType), summaryText);
+              localStorage.setItem(lastSummarizedTypeKey(docId), summaryType);
+            } catch {
+              // ignore
+            }
+          }
+        }
 
         setServerSummaryAvailable((prev) => {
           const existingForDoc = prev[docId] || {};
-          if (existingForDoc[selectedType] === available) return prev;
+          const changed = SUMMARY_TYPES.some((t) => existingForDoc[t] !== availableByType[t]);
+          if (!changed) return prev;
           return {
             ...prev,
             [docId]: {
               ...existingForDoc,
-              [selectedType]: available,
+              ...availableByType,
             },
           };
         });
-
-        if (available && summaryText) {
-          try {
-            localStorage.setItem(summaryStorageKey(docId, selectedType), summaryText);
-            localStorage.setItem(lastSummarizedTypeKey(docId), selectedType);
-          } catch {
-            // ignore
-          }
-        }
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        // On error, only mark the selected type as unavailable to allow retries
         setServerSummaryAvailable((prev) => {
           const existingForDoc = prev[docId] || {};
           if (existingForDoc[selectedType] === false) return prev;
@@ -335,6 +423,69 @@ export default function Documents() {
     } catch {
       // ignore
     }
+
+    // Re-probe server for this document so the list UI updates immediately
+    // (useful when summaries were created on another device).
+    void (async () => {
+      try {
+        const all = await fetchDocumentSummaries(docId);
+        if (all !== null) {
+          const availableByType: Partial<Record<SummaryType, boolean>> = {};
+          for (const t of SUMMARY_TYPES) availableByType[t] = false;
+
+          for (const item of all) {
+            const t = typeof item.summaryType === "string" ? item.summaryType : "";
+            const text = typeof item.summaryText === "string" ? item.summaryText : "";
+            if (!t || !text) continue;
+            if (t === "detailed" || t === "concise" || t === "bullet-points") {
+              availableByType[t] = true;
+              try {
+                localStorage.setItem(summaryStorageKey(docId, t), text);
+                localStorage.setItem(lastSummarizedTypeKey(docId), t);
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          setServerSummaryAvailable((prev) => ({
+            ...prev,
+            [docId]: {
+              ...(prev[docId] || {}),
+              ...availableByType,
+            },
+          }));
+
+          return;
+        }
+
+        // Fallback: probe all types individually so cross-device summaries are discovered.
+        const availableByType: Partial<Record<SummaryType, boolean>> = {};
+        for (const t of SUMMARY_TYPES) {
+          const text = await fetchDocumentSummary(docId, t);
+          const available = Boolean(text && text.trim());
+          availableByType[t] = available;
+          if (available && text) {
+            try {
+              localStorage.setItem(summaryStorageKey(docId, t), text);
+              localStorage.setItem(lastSummarizedTypeKey(docId), t);
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        setServerSummaryAvailable((prev) => ({
+          ...prev,
+          [docId]: {
+            ...(prev[docId] || {}),
+            ...availableByType,
+          },
+        }));
+      } catch {
+        // ignore errors - we don't want UI to break on probe failure
+      }
+    })();
   };
 
   return (
