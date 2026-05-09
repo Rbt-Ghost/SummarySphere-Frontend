@@ -318,6 +318,8 @@ export default function DocumentDetail() {
 
     try {
       const pdf = new jsPDF({ unit: "pt", format: "a4" });
+      pdf.setLineHeightFactor(1.3);
+      pdf.setCharSpace(0);
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -344,16 +346,37 @@ export default function DocumentDetail() {
       y += 22;
 
       pdf.setFontSize(11);
-      const lines = pdf.splitTextToSize(text, maxWidth);
       const lineHeight = 14;
 
-      for (const line of lines) {
-        if (y + lineHeight > pageHeight - margin) {
+      const normalizedText = text
+        .replace(/\r\n/g, "\n")
+        .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      const paragraphs = normalizedText.split(/\n\n+/);
+
+      for (const paragraph of paragraphs) {
+        const paragraphText = paragraph.replace(/\s+/g, " ").trim();
+        if (!paragraphText) continue;
+
+        const lines = pdf.splitTextToSize(paragraphText, maxWidth);
+        for (const line of lines) {
+          if (y + lineHeight > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        }
+
+        y += 6;
+        if (y > pageHeight - margin) {
           pdf.addPage();
           y = margin;
         }
-        pdf.text(line, margin, y);
-        y += lineHeight;
       }
 
       const base = safeFilenamePart(title) || "summary";
