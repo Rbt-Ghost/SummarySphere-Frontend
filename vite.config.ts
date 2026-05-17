@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://bcbeno.me', 
+        target: 'https://summarysphere.bcbeno.me', 
         // For local development, you can use the following line instead:
         //target: 'http://localhost:8080',
         changeOrigin: true,

@@ -2,6 +2,7 @@ import { authStorage } from "./services/authStorage";
 
 const DOCUMENTS_BASE_URL = (import.meta.env.VITE_DOCUMENTS_BASE_URL as string | undefined) ?? "/api/documents";
 const USERS_BASE_URL = (import.meta.env.VITE_USERS_BASE_URL as string | undefined) ?? "/api/users";
+const AGENT_BASE_URL = DOCUMENTS_BASE_URL.replace("/documents", "/agent");
 
 const throwError = async (response: Response, defaultMsg: string) => {
     // If the token is expired/invalid, clear it so the app can re-authenticate.
@@ -367,4 +368,59 @@ export const deleteMyAccount = async () => {
     if (!response.ok) {
         await throwError(response, "Failed to delete account");
     }
+};
+
+// --- Agent API Endpoints ---
+
+export interface AgentToolCall {
+    toolName: string;
+    arguments: string;
+    result: string;
+}
+
+export interface AgentMessage {
+    role: "USER" | "ASSISTANT" | "TOOL";
+    content: string;
+    toolName?: string;
+    toolCallId?: string;
+    createdAt: string;
+}
+
+export interface AgentChatDTO {
+    conversationId: string;
+    createdAt: string;
+    lastMessageAt: string;
+    messages: AgentMessage[];
+}
+
+export interface AgentChatResponse {
+    conversationId: string;
+    message: AgentMessage;
+    toolCalls: AgentToolCall[];
+}
+
+export const getAgentChat = async (): Promise<AgentChatDTO> => {
+    const response = await fetch(`${AGENT_BASE_URL}/chat?t=${Date.now()}`, {
+        headers: { ...NO_CACHE_HEADERS, ...authHeaders() },
+    });
+    if (!response.ok) await throwError(response, "Failed to get agent chat");
+    return response.json();
+};
+
+export const sendAgentMessage = async (message: string): Promise<AgentChatResponse> => {
+    const response = await fetch(`${AGENT_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...NO_CACHE_HEADERS, ...authHeaders() },
+        body: JSON.stringify({ message }),
+    });
+    if (!response.ok) await throwError(response, "Failed to send message to agent");
+    return response.json();
+};
+
+export const clearAgentChat = async (): Promise<void> => {
+    const response = await fetch(`${AGENT_BASE_URL}/chat`, {
+        method: "DELETE",
+        headers: { ...NO_CACHE_HEADERS, ...authHeaders() },
+    });
+    if (!response.ok) await throwError(response, "Failed to clear agent chat");
 };
