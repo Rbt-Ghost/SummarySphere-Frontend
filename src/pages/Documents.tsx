@@ -12,7 +12,6 @@ import {
   Sparkles,
   Eye,
   AlertTriangle,
-  MessageCircle,
   Send,
   Bot
 } from "lucide-react";
