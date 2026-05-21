@@ -112,6 +112,7 @@ export default function Documents() {
   const [isSendingAgentMessage, setIsSendingAgentMessage] = useState(false);
   const [isClearingAgentChat, setIsClearingAgentChat] = useState(false);
   const agentMessagesEndRef = useRef<HTMLDivElement>(null);
+  const agentChatLoaded = useRef(false);
 
   const loadDocs = async () => {
     try {
@@ -513,14 +514,19 @@ export default function Documents() {
 
   // --- Agent Chat Logic ---
   useEffect(() => {
+    if (!isAgentChatOpen) return;
+
     let cancelled = false;
     const initAgentChat = async () => {
-      setIsAgentChatLoading(true);
+      if (!agentChatLoaded.current) {
+        setIsAgentChatLoading(true);
+      }
       try {
         const chatData = await getAgentChat();
         if (!cancelled) {
           setAgentConversationId(chatData.conversationId);
           setAgentMessages(chatData.messages);
+          agentChatLoaded.current = true;
         }
       } catch (err) {
         console.error("Failed to load agent chat", err);
@@ -530,7 +536,7 @@ export default function Documents() {
     };
     initAgentChat();
     return () => { cancelled = true; };
-  }, []);
+  }, [isAgentChatOpen]);
 
   useEffect(() => {
     agentMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -940,10 +946,10 @@ export default function Documents() {
                   type="text"
                   value={agentChatInput}
                   onChange={(e) => setAgentChatInput(e.target.value)}
-                  placeholder="Ask the Agent to do something…"
-                  disabled={isSendingAgentMessage}
+                  placeholder={isAgentChatLoading ? "Loading chat..." : "Ask the Agent to do something…"}
+                  disabled={isSendingAgentMessage || isAgentChatLoading}
                   className={`flex-1 px-3 py-2 rounded-xl text-sm border transition-colors outline-none
-                    ${isSendingAgentMessage ? "opacity-50 cursor-not-allowed" : ""}
+                    ${(isSendingAgentMessage || isAgentChatLoading) ? "opacity-50 cursor-not-allowed" : ""}
                     ${dark
                       ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-purple-500"
                       : "bg-zinc-50 border-zinc-200 text-slate-900 placeholder-zinc-400 focus:border-purple-400"
@@ -952,9 +958,9 @@ export default function Documents() {
                 />
                 <button
                   type="submit"
-                  disabled={!agentChatInput.trim() || isSendingAgentMessage}
+                  disabled={!agentChatInput.trim() || isSendingAgentMessage || isAgentChatLoading}
                   className={`px-3 py-2 rounded-xl flex items-center justify-center transition-all
-                    ${!agentChatInput.trim() || isSendingAgentMessage ? "opacity-40 cursor-not-allowed" : "hover:scale-105 cursor-pointer"}
+                    ${!agentChatInput.trim() || isSendingAgentMessage || isAgentChatLoading ? "opacity-40 cursor-not-allowed" : "hover:scale-105 cursor-pointer"}
                     ${dark ? "bg-purple-600 text-white" : "bg-purple-500 text-white"}
                   `}
                 >

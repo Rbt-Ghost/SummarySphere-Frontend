@@ -399,12 +399,27 @@ export interface AgentChatResponse {
     toolCalls: AgentToolCall[];
 }
 
+let activeAgentChatPromise: Promise<AgentChatDTO> | null = null;
+
 export const getAgentChat = async (): Promise<AgentChatDTO> => {
-    const response = await fetch(`${AGENT_BASE_URL}/chat?t=${Date.now()}`, {
-        headers: { ...NO_CACHE_HEADERS, ...authHeaders() },
-    });
-    if (!response.ok) await throwError(response, "Failed to get agent chat");
-    return response.json();
+    if (activeAgentChatPromise) {
+        return activeAgentChatPromise;
+    }
+
+    activeAgentChatPromise = (async () => {
+        const response = await fetch(`${AGENT_BASE_URL}/chat?t=${Date.now()}`, {
+            headers: { ...NO_CACHE_HEADERS, ...authHeaders() },
+        });
+        if (!response.ok) {
+            activeAgentChatPromise = null;
+            await throwError(response, "Failed to get agent chat");
+        }
+        const data = await response.json();
+        activeAgentChatPromise = null;
+        return data;
+    })();
+
+    return activeAgentChatPromise;
 };
 
 export const sendAgentMessage = async (message: string): Promise<AgentChatResponse> => {
