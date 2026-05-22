@@ -75,7 +75,7 @@ The app will run on the local Vite development server.
 
 ## 📖 Repository Info
 
-You're currently looking at the back-end code. Click [here](https://github.com/Rbt-Ghost/SummarySphere-Frontend) to see the back-end repository.
+You're currently looking at the front-end code. Click [here](https://github.com/BCBeno/SummarySphere-BackEnd) to see the back-end repository.
 
 The repository is maintained by:
 
