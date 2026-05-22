@@ -13,6 +13,10 @@ const Login = lazy(() => import("./pages/Login.tsx"));
 const SignUp = lazy(() => import("./pages/SignUp.tsx"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword.tsx"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy.tsx"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService.tsx"));
+const GDPR = lazy(() => import("./pages/GDPR.tsx"));
+const LegalNotice = lazy(() => import("./pages/LegalNotice.tsx"));
 
 export default function App() {
   const [dark] = useState(() => {
@@ -37,6 +41,10 @@ export default function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/gdpr" element={<GDPR />} />
+        <Route path="/legal" element={<LegalNotice />} />
 
         <Route element={<RequireAuth />}>
           <Route path="/upload" element={<Upload />} />

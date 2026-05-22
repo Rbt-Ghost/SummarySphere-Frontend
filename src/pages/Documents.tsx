@@ -97,6 +97,7 @@ export default function Documents() {
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [summaryTypeByDocId, setSummaryTypeByDocId] = useState<Record<string, SummaryType>>({});
   const [serverSummaryAvailable, setServerSummaryAvailable] = useState<
     Record<string, Partial<Record<SummaryType, boolean>>>
@@ -379,7 +380,8 @@ export default function Documents() {
   };
 
   const confirmDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || isDeleting) return;
+    setIsDeleting(true);
 
     try {
       await deleteDocument(deleteId);
@@ -401,6 +403,7 @@ export default function Documents() {
       toast.error(error instanceof Error ? error.message : "Error deleting document");
       await loadDocs();
     } finally {
+      setIsDeleting(false);
       setDeleteId(null);
     }
   };
@@ -625,7 +628,7 @@ export default function Documents() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => setDeleteId(null)}
+            onClick={() => { if (!isDeleting) setDeleteId(null); }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -649,14 +652,17 @@ export default function Documents() {
               <div className="mt-8 flex justify-end gap-3">
                 <button
                   onClick={() => setDeleteId(null)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
+                  disabled={isDeleting}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDeleting ? "opacity-50 cursor-not-allowed" : ""} ${dark ? 'hover:bg-slate-700' : 'hover:bg-zinc-100'}`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all"
+                  disabled={isDeleting}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all flex items-center gap-2 ${isDeleting ? "opacity-80 cursor-not-allowed" : ""}`}
                 >
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Delete Document
                 </button>
               </div>
