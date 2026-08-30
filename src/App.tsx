@@ -4,6 +4,7 @@ import './index.css'
 import LoadingPage from "./pages/Loading.tsx";
 import { ToastProvider } from "./components/Toast";
 import RequireAuth from "./components/RequireAuth";
+import RequireVerifiedEmail from "./components/RequireVerifiedEmail";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Upload = lazy(() => import("./pages/Upload.tsx"));
@@ -13,6 +14,7 @@ const Login = lazy(() => import("./pages/Login.tsx"));
 const SignUp = lazy(() => import("./pages/SignUp.tsx"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword.tsx"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail.tsx"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy.tsx"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService.tsx"));
 const GDPR = lazy(() => import("./pages/GDPR.tsx"));
@@ -41,15 +43,18 @@ export default function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/gdpr" element={<GDPR />} />
         <Route path="/legal" element={<LegalNotice />} />
 
         <Route element={<RequireAuth />}>
-          <Route path="/upload" element={<Upload />} />
-          <Route path="/documents" element={<Documents />} />
-          <Route path="/documents/:id" element={<DocumentDetails />} />
+          <Route element={<RequireVerifiedEmail />}>
+            <Route path="/upload" element={<Upload />} />
+            <Route path="/documents" element={<Documents />} />
+            <Route path="/documents/:id" element={<DocumentDetails />} />
+          </Route>
         </Route>
       </Routes>
     </Suspense>

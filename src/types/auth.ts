@@ -3,6 +3,7 @@ export interface AuthUser {
   email?: string;
   name?: string;
   role?: string;
+  emailVerified?: boolean;
 }
 
 export interface AuthSession {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sun, Moon, UserRound, ChevronDown, LogOut, Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import { Sun, Moon, UserRound, ChevronDown, LogOut, Trash2, AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import CTAButton from "../components/CTAbutton";
@@ -11,11 +11,12 @@ import { deleteMyAccount } from "../api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isAuthenticated, session, logout } = useAuth();
+  const { isAuthenticated, session, logout, sendVerificationEmail } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
 
   const [dark, setDark] = useState(() => {
     if(typeof window !== "undefined") {
@@ -106,6 +107,33 @@ export default function Dashboard() {
     }
   };
 
+  const onSendVerificationEmail = async () => {
+    if (isSendingVerification) return;
+    setIsSendingVerification(true);
+    try {
+      await sendVerificationEmail();
+      toast.success("Verification email sent. Check your inbox.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send verification email");
+    } finally {
+      setIsSendingVerification(false);
+    }
+  };
+
+  const navigateToFeature = (path: string) => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    if (!session?.user?.emailVerified) {
+      setIsProfileOpen(true);
+      toast.error("Verify your email to use this feature.");
+      return;
+    }
+    navigate(path);
+  };
+
   return (
     <div className={dark ? "min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-6" : "min-h-screen bg-zinc-200 text-black flex flex-col items-center justify-center px-6"}>
       <AnimatePresence>
@@ -191,11 +219,11 @@ export default function Dashboard() {
               role="menu"
               aria-label="User menu"
               className={
-                "mt-3 w-64 rounded-2xl border shadow-xl overflow-hidden " +
+                "mt-3 w-80 rounded-2xl border shadow-xl overflow-hidden " +
                 (dark ? "bg-slate-800 border-slate-700" : "bg-white border-zinc-200")
               }
             >
-              <div className={"px-4 py-3 border-b " + (dark ? "border-slate-700" : "border-zinc-200")}>
+              <div className="px-4 py-3">
                 <div className="text-sm font-semibold truncate">{session?.user?.name || "Signed in"}</div>
                 {session?.user?.email ? (
                   <div className={"text-xs truncate " + (dark ? "text-slate-300" : "text-zinc-600")}>
@@ -203,6 +231,34 @@ export default function Dashboard() {
                   </div>
                 ) : null}
               </div>
+
+              {!session?.user?.emailVerified ? (
+                <div className="px-3 pb-3">
+                  <div className={
+                    "rounded-xl border p-3 " +
+                    (dark ? "border-amber-500/50 bg-amber-500/10" : "border-amber-300 bg-amber-50")
+                  }>
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-amber-400" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold">Verify your email</div>
+                        <p className={"mt-1 text-xs leading-5 " + (dark ? "text-slate-300" : "text-zinc-600")}>
+                          Verify your email to upload and use all features.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void onSendVerificationEmail()}
+                      disabled={isSendingVerification}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isSendingVerification ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {isSendingVerification ? "Sending..." : "Send verification email"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className={"h-px " + (dark ? "bg-slate-700" : "bg-zinc-200")} />
 
@@ -258,10 +314,10 @@ export default function Dashboard() {
         Summary Sphere
       </motion.h1>
 
-      <CTAButton 
+      <CTAButton
         dark={dark}
         size="large"
-        onClick={() => navigate("/upload")}
+        onClick={() => navigateToFeature("/upload")}
       >
         Let's get started
       </CTAButton>
@@ -272,11 +328,11 @@ export default function Dashboard() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
           className="mt-2"
-          onClick={() => navigate("/documents")}
+          onClick={() => navigateToFeature("/documents")}
         >
-          <a href="#" className="text-sm underline opacity-70 hover:opacity-100 transition-opacity">
+          <button type="button" className="text-sm underline opacity-70 hover:opacity-100 transition-opacity">
             View documents list
-          </a>
+          </button>
         </motion.div>
       ) : null}
 

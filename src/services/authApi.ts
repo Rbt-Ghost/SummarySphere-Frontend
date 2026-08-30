@@ -14,7 +14,8 @@ const throwError = async (response: Response, defaultMsg: string) => {
       else if (json?.error) errorMsg = json.error;
       else if (typeof json === "string") errorMsg = json;
     } catch {
-      if (text.length < 200) errorMsg = text;
+      const isHtml = text.trimStart().startsWith("<!DOCTYPE html") || text.trimStart().startsWith("<html");
+      if (!isHtml && text.length < 200) errorMsg = text;
     }
   }
 
@@ -27,6 +28,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 const readString = (value: unknown): string | null => {
   return typeof value === "string" ? value : null;
+};
+
+const readBoolean = (value: unknown): boolean | null => {
+  return typeof value === "boolean" ? value : null;
 };
 
 const extractSession = (payload: unknown): AuthSession => {
@@ -61,7 +66,15 @@ const extractSession = (payload: unknown): AuthSession => {
     readString(root.role) ??
     readString(data.role);
 
-  const user = email || name || role ? ({ email: email ?? undefined, name: name ?? undefined, role: role ?? undefined } as const) : undefined;
+  const emailVerified =
+    readBoolean((embeddedUser as Record<string, unknown> | undefined)?.emailVerified) ??
+    readBoolean(root.emailVerified) ??
+    readBoolean(data.emailVerified) ??
+    false;
+
+  const user = email || name || role
+    ? ({ email: email ?? undefined, name: name ?? undefined, role: role ?? undefined, emailVerified } as const)
+    : undefined;
   return { token, user };
 };
 
@@ -194,6 +207,26 @@ export const authApi = {
     const response = await postJsonWithRetry(`${AUTH_BASE_URL}/reset-password`, { token, newPassword });
     if (!response.ok) {
       await throwError(response, "Failed to reset password");
+    }
+  },
+
+  async requestEmailVerification(authToken: string): Promise<void> {
+    const response = await fetch(`${AUTH_BASE_URL}/email-verification/request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+    if (!response.ok) {
+      await throwError(response, "Failed to send verification email");
+    }
+  },
+
+  async confirmEmailVerification(token: string): Promise<void> {
+    const response = await postJsonWithRetry(`${AUTH_BASE_URL}/email-verification/confirm`, { token });
+    if (!response.ok) {
+      await throwError(response, "Failed to verify email");
     }
   },
 };

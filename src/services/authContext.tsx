@@ -10,6 +10,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (body: LoginRequest) => Promise<void>;
   signup: (body: SignupRequest) => Promise<{ autoLoggedIn: boolean }>;
+  sendVerificationEmail: () => Promise<void>;
+  confirmEmailVerification: (token: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -74,12 +76,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     authStorage.clear();
   };
 
+  const sendVerificationEmail = async () => {
+    if (!session?.token) throw new Error("Authentication required");
+    await authApi.requestEmailVerification(session.token);
+  };
+
+  const confirmEmailVerification = async (token: string) => {
+    await authApi.confirmEmailVerification(token);
+    setSession((current) => {
+      if (!current) return current;
+      const next: AuthSession = {
+        ...current,
+        user: { ...current.user, emailVerified: true },
+      };
+      authStorage.set(next);
+      return next;
+    });
+  };
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       isAuthenticated: Boolean(session?.token),
       login,
       signup,
+      sendVerificationEmail,
+      confirmEmailVerification,
       logout,
     }),
     [session]
