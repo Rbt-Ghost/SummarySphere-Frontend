@@ -170,7 +170,19 @@ export const downloadDocument = async (id: string, filename: string) => {
     document.body.removeChild(a);
 };
 
-export const summarizeDocument = async (id: string, summaryType: string = "general") => {
+export type SummaryStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+export interface SummarizeAcceptedResponse {
+    summaryId?: number;
+    status: SummaryStatus;
+    summaryText?: string;
+    message?: string;
+}
+
+export const summarizeDocument = async (
+    id: string,
+    summaryType: string = "general"
+): Promise<SummarizeAcceptedResponse> => {
     const response = await fetch(`${DOCUMENTS_BASE_URL}/${id}/summarize`, { 
     method: "POST", 
     headers: {
@@ -182,9 +194,14 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
   });
   
   if (response.status === 409) {
-    const existing = await fetchDocumentSummary(id, summaryType);
+    const existing = await fetchDocumentSummaryState(id, summaryType);
     if (existing) {
-      return { summaryText: existing, message: existing, summaryType };
+      const status = normalizeSummaryStatus(existing.status, existing.summaryText);
+      return {
+        status,
+        summaryText: existing.summaryText,
+        message: existing.summaryText,
+      };
     }
   }
   
@@ -192,16 +209,31 @@ export const summarizeDocument = async (id: string, summaryType: string = "gener
     await throwError(response, "Failed to summarize document");
   }
 
-  return response.json();
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+  const legacyText = extractSummaryText(payload);
+  return {
+    summaryId: typeof payload.summaryId === "number" ? payload.summaryId : undefined,
+    status: normalizeSummaryStatus(payload.status, legacyText),
+    summaryText: legacyText ?? undefined,
+    message: legacyText ?? undefined,
+  };
 };
 
-type DocumentSummaryResponse = {
+export type DocumentSummaryResponse = {
+    summaryId?: number;
     documentId?: string;
     summaryType?: string;
     summaryText?: string;
     status?: string;
     createdAt?: string;
     message?: string;
+};
+
+const normalizeSummaryStatus = (status: unknown, summaryText?: string | null): SummaryStatus => {
+    if (status === "PENDING" || status === "PROCESSING" || status === "COMPLETED" || status === "FAILED") {
+        return status;
+    }
+    return summaryText ? "COMPLETED" : "PENDING";
 };
 
 /**
@@ -246,10 +278,13 @@ const extractSummaryText = (payload: unknown): string | null => {
  * Primary: GET /api/documents/{id}/summary/{summaryType}
  * Fallback: GET /api/documents/{id}/summary (returns latest), shown only if types match.
  */
-export const fetchDocumentSummary = async (id: string, summaryType: string): Promise<string | null> => {
+export const fetchDocumentSummaryState = async (
+    id: string,
+    summaryType: string
+): Promise<DocumentSummaryResponse | null> => {
     const encodedType = encodeURIComponent(summaryType);
 
-    const tryTyped = async (): Promise<string | null> => {
+    const tryTyped = async (): Promise<DocumentSummaryResponse | null> => {
         const primary = await fetch(`${DOCUMENTS_BASE_URL}/${id}/summary/${encodedType}?t=${Date.now()}`, {
             headers: {
                 ...NO_CACHE_HEADERS,
@@ -288,10 +323,10 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
 
         typedSummaryEndpointHealth = "ok";
         const payload: DocumentSummaryResponse = await primary.json().catch(() => ({} as DocumentSummaryResponse));
-        return extractSummaryText(payload);
+        return payload;
     };
 
-    const tryFallback = async (): Promise<string | null> => {
+    const tryFallback = async (): Promise<DocumentSummaryResponse | null> => {
         const fallback = await fetch(`${DOCUMENTS_BASE_URL}/${id}/summary?t=${Date.now()}`, {
             headers: {
                 ...NO_CACHE_HEADERS,
@@ -308,7 +343,7 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
         // If backend omits summaryType, do NOT assume it's the requested type.
         if (!returnedType) return null;
         if (returnedType.toLowerCase() !== summaryType.toLowerCase()) return null;
-        return extractSummaryText(payload);
+        return payload;
     };
 
     // Prefer the typed endpoint so cross-device retrieval works for non-latest summaries.
@@ -319,6 +354,57 @@ export const fetchDocumentSummary = async (id: string, summaryType: string): Pro
     }
 
     return await tryFallback();
+};
+
+export const fetchDocumentSummary = async (id: string, summaryType: string): Promise<string | null> => {
+    const state = await fetchDocumentSummaryState(id, summaryType);
+    return extractSummaryText(state);
+};
+
+const pollingDelay = (milliseconds: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
+    const timeoutId = window.setTimeout(resolve, milliseconds);
+    signal?.addEventListener("abort", () => {
+        window.clearTimeout(timeoutId);
+        resolve();
+    }, { once: true });
+});
+
+export const waitForDocumentSummary = async (
+    id: string,
+    summaryType: string,
+    options: {
+        signal?: AbortSignal;
+        intervalMs?: number;
+        timeoutMs?: number;
+        onStatus?: (status: SummaryStatus) => void;
+    } = {}
+): Promise<DocumentSummaryResponse> => {
+    const intervalMs = options.intervalMs ?? 1500;
+    const timeoutMs = options.timeoutMs ?? 5 * 60_000;
+    const startedAt = Date.now();
+
+    while (!options.signal?.aborted && Date.now() - startedAt < timeoutMs) {
+        const state = await fetchDocumentSummaryState(id, summaryType);
+        if (state) {
+            const text = extractSummaryText(state);
+            const status = normalizeSummaryStatus(state.status, text);
+            options.onStatus?.(status);
+
+            if (status === "COMPLETED" && text) {
+                return { ...state, status, summaryText: text };
+            }
+            if (status === "FAILED") {
+                throw new Error("Summary generation failed. Please try again.");
+            }
+        }
+
+        await pollingDelay(intervalMs, options.signal);
+    }
+
+    if (options.signal?.aborted) {
+        throw new Error("Summary polling was cancelled.");
+    }
+    throw new Error("Summary generation is taking longer than expected. You can return later to check it.");
 };
 
 export type ChatRole = "USER" | "ASSISTANT";

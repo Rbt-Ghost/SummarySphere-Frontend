@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import Footer from "../components/Footer";
 import CTAButton from "../components/CTAbutton";
-import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary, fetchDocumentSummaries, fetchChatHistory, sendChatMessage, clearChatHistory } from "../api";
-import type { ChatMessage } from "../api";
+import { fetchDocumentById, summarizeDocument, downloadDocument, fetchDocumentSummary, fetchDocumentSummaries, fetchChatHistory, sendChatMessage, clearChatHistory, waitForDocumentSummary } from "../api";
+import type { ChatMessage, SummaryStatus } from "../api";
 import { toast } from "../components/Toast"; // Removed Provider import
 
 interface DocDetail {
@@ -85,7 +85,9 @@ export default function DocumentDetail() {
   const [summaryType, setSummaryType] = useState<SummaryType>("detailed");
   const [isSummaryTypeInitialized, setIsSummaryTypeInitialized] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [summaryStatus, setSummaryStatus] = useState<SummaryStatus | null>(null);
   const [serverSummariesByType, setServerSummariesByType] = useState<Partial<Record<SummaryType, string>>>({});
+  const [serverSummaryStatusesByType, setServerSummaryStatusesByType] = useState<Partial<Record<SummaryType, SummaryStatus>>>({});
   const [serverSummaryTypesKnown, setServerSummaryTypesKnown] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -156,6 +158,7 @@ export default function DocumentDetail() {
     if (cachedTyped) {
       setIsLoadingSummary(false);
       setSummary(cachedTyped);
+      setSummaryStatus("COMPLETED");
       return;
     }
 
@@ -174,15 +177,22 @@ export default function DocumentDetail() {
 
           if (all !== null) {
             const next: Partial<Record<SummaryType, string>> = {};
+            const nextStatuses: Partial<Record<SummaryType, SummaryStatus>> = {};
             for (const item of all) {
               const t = typeof item.summaryType === "string" ? item.summaryType : "";
               const text = typeof item.summaryText === "string" ? item.summaryText : "";
-              if (!t || !text) continue;
               if (!isValidSummaryType(t)) continue;
-              next[t] = text;
+              if (item.status === "PENDING" || item.status === "PROCESSING" || item.status === "COMPLETED" || item.status === "FAILED") {
+                nextStatuses[t] = item.status;
+              }
+              if (text) {
+                next[t] = text;
+                nextStatuses[t] = "COMPLETED";
+              }
             }
 
             setServerSummariesByType(next);
+            setServerSummaryStatusesByType(nextStatuses);
             setServerSummaryTypesKnown(true);
             known = true;
             summariesByType = next;
@@ -202,6 +212,7 @@ export default function DocumentDetail() {
 
             const fromServer = summariesByType[summaryType];
             setSummary(fromServer ?? null);
+            setSummaryStatus(nextStatuses[summaryType] ?? (fromServer ? "COMPLETED" : null));
             return;
           }
 
@@ -229,12 +240,14 @@ export default function DocumentDetail() {
 
           const fromServer = summariesByType[summaryType];
           setSummary(fromServer ?? null);
+          setSummaryStatus(fromServer ? "COMPLETED" : null);
           return;
         }
 
         // If we know the server summaries, don't hit per-type endpoint for missing types.
         if (known) {
           const fromServer = summariesByType[summaryType];
+          setSummaryStatus(serverSummaryStatusesByType[summaryType] ?? (fromServer ? "COMPLETED" : null));
           if (fromServer) {
             setSummary(fromServer);
             return;
@@ -248,6 +261,7 @@ export default function DocumentDetail() {
         if (cancelled) return;
         if (existing) {
           setSummary(existing);
+          setSummaryStatus("COMPLETED");
           return;
         }
 
@@ -255,6 +269,7 @@ export default function DocumentDetail() {
         const lastType = safeLocalStorageGet(lastSummarizedTypeKey(id));
         if (legacy && lastType && lastType.toLowerCase() === summaryType.toLowerCase()) {
           setSummary(legacy);
+          setSummaryStatus("COMPLETED");
           return;
         }
 
@@ -271,14 +286,14 @@ export default function DocumentDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, summaryType, isSummaryTypeInitialized, serverSummaryTypesKnown, serverSummariesByType]);
+  }, [id, summaryType, isSummaryTypeInitialized, serverSummaryTypesKnown, serverSummariesByType, serverSummaryStatusesByType]);
 
   const handleSummarize = async () => {
     if (!id || !documentMeta) return;
     
     setIsSummarizing(true);
     try {
-      setDocumentMeta({ ...documentMeta, status: "PROCESSING" });
+      setDocumentMeta({ ...documentMeta, status: "PENDING" });
 
       const data = await summarizeDocument(id, summaryType);
       
@@ -294,19 +309,66 @@ export default function DocumentDetail() {
 
         // Keep the in-memory server map in sync so switching types is instant.
         setServerSummariesByType((prev) => ({ ...prev, [summaryType]: data.message }));
+        setServerSummaryStatusesByType((prev) => ({ ...prev, [summaryType]: "COMPLETED" }));
         setServerSummaryTypesKnown(true);
 
         setDocumentMeta({ ...documentMeta, status: "COMPLETED" });
+        setSummaryStatus("COMPLETED");
         toast.success("Summary generated successfully!"); 
+      } else {
+        setSummaryStatus(data.status);
+        setServerSummaryStatusesByType((prev) => ({ ...prev, [summaryType]: data.status }));
+        setDocumentMeta({ ...documentMeta, status: data.status });
+        toast.success("Summary generation started.");
       }
     } catch (err) {
       toast.error("Failed to generate summary. Please try again.");
       console.error(err);
-      setDocumentMeta({ ...documentMeta, status: "PENDING" }); 
+      setSummaryStatus("FAILED");
+      setDocumentMeta({ ...documentMeta, status: "FAILED" }); 
     } finally {
       setIsSummarizing(false);
     }
   };
+
+  useEffect(() => {
+    if (!id || (summaryStatus !== "PENDING" && summaryStatus !== "PROCESSING")) return;
+
+    const controller = new AbortController();
+    void waitForDocumentSummary(id, summaryType, {
+      signal: controller.signal,
+      onStatus: (status) => {
+        setSummaryStatus(status);
+        setDocumentMeta((current) => current ? { ...current, status } : current);
+      },
+    }).then((completed) => {
+      const text = completed.summaryText;
+      if (!text) return;
+      setSummary(text);
+      setSummaryStatus("COMPLETED");
+      setServerSummariesByType((prev) => ({ ...prev, [summaryType]: text }));
+      setServerSummaryStatusesByType((prev) => ({ ...prev, [summaryType]: "COMPLETED" }));
+      setServerSummaryTypesKnown(true);
+      setDocumentMeta((current) => current ? { ...current, status: "COMPLETED" } : current);
+      try {
+        localStorage.setItem(`summary-${id}`, text);
+        localStorage.setItem(summaryStorageKey(id, summaryType), text);
+        localStorage.setItem(lastSummarizedTypeKey(id), summaryType);
+      } catch {
+        // ignore
+      }
+      toast.success("Summary generated successfully!");
+    }).catch((err) => {
+      if (controller.signal.aborted) return;
+      console.error(err);
+      setSummaryStatus("FAILED");
+      setServerSummaryStatusesByType((prev) => ({ ...prev, [summaryType]: "FAILED" }));
+      setDocumentMeta((current) => current ? { ...current, status: "FAILED" } : current);
+      toast.error(err instanceof Error ? err.message : "Failed to generate summary.");
+    });
+
+    return () => controller.abort();
+  }, [id, summaryType, summaryStatus]);
 
   const handleSummaryTypeChange = (newType: SummaryType) => {
     if (!id) return;
@@ -562,13 +624,13 @@ export default function DocumentDetail() {
 
               <button 
                 onClick={handleDownloadSummaryPdf}
-                disabled={!summary || isLoadingSummary || isSummarizing}
+                disabled={!summary || isLoadingSummary || isSummarizing || summaryStatus === "PENDING" || summaryStatus === "PROCESSING"}
                 className={`w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors border
                   ${dark
                     ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border-purple-500/20'
                     : 'bg-purple-600/10 hover:bg-purple-600/15 text-purple-700 border-purple-600/20'
                   }
-                  ${(!summary || isLoadingSummary || isSummarizing) ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}
+                  ${(!summary || isLoadingSummary || isSummarizing || summaryStatus === "PENDING" || summaryStatus === "PROCESSING") ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}
                 `}
               >
                 <FileText className="w-4 h-4" /> Download Summary
@@ -592,11 +654,11 @@ export default function DocumentDetail() {
                   aria-label="Summary type"
                   value={summaryType}
                   onChange={(e) => handleSummaryTypeChange(e.target.value as SummaryType)}
-                  disabled={documentMeta.status === "PROCESSING"}
+                  disabled={summaryStatus === "PENDING" || summaryStatus === "PROCESSING"}
                   className={`
                     h-9 px-2 rounded-lg text-xs font-medium border transition-colors
                     w-full sm:w-auto
-                    ${documentMeta.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
+                    ${(summaryStatus === "PENDING" || summaryStatus === "PROCESSING") ? "opacity-50 cursor-not-allowed" : ""}
                     ${dark
                       ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
                       : "bg-white border-zinc-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-300"
@@ -614,7 +676,7 @@ export default function DocumentDetail() {
                     dark={dark}
                     size="small"
                     onClick={handleSummarize}
-                    disabled={isSummarizing || documentMeta.status === "PROCESSING"}
+                    disabled={isSummarizing || summaryStatus === "PENDING" || summaryStatus === "PROCESSING"}
                     className="w-full sm:w-auto"
                   >
                     {isSummarizing ? (
@@ -636,11 +698,26 @@ export default function DocumentDetail() {
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-8">
-                  {isSummarizing || isLoadingSummary ? (
+                  {isSummarizing || isLoadingSummary || summaryStatus === "PENDING" || summaryStatus === "PROCESSING" ? (
                      <div className="flex flex-col items-center gap-3">
                         <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
-                        <p>{isSummarizing ? "Analyzing document..." : "Loading summary..."}</p>
+                        <p>
+                          {summaryStatus === "PENDING"
+                            ? "Summary queued..."
+                            : summaryStatus === "PROCESSING"
+                              ? "Analyzing document..."
+                              : "Loading summary..."}
+                        </p>
+                        {(summaryStatus === "PENDING" || summaryStatus === "PROCESSING") && (
+                          <p className="text-sm">You can leave this page. Processing will continue in the background.</p>
+                        )}
                      </div>
+                  ) : summaryStatus === "FAILED" ? (
+                    <div className="flex flex-col items-center gap-3 text-red-500 opacity-100">
+                      <AlertCircle className="w-12 h-12" />
+                      <p>Summary generation failed.</p>
+                      <p className="text-sm opacity-70">You can try generating it again.</p>
+                    </div>
                   ) : (
                     <>
                       <FileText className="w-16 h-16 mb-4" />

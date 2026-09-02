@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -29,6 +29,7 @@ import {
   getAgentChat,
   sendAgentMessage,
   clearAgentChat,
+  waitForDocumentSummary,
   type AgentMessage
 } from "../api";
 import { toast } from "../components/Toast";
@@ -115,7 +116,7 @@ export default function Documents() {
   const agentMessagesEndRef = useRef<HTMLDivElement>(null);
   const agentChatLoaded = useRef(false);
 
-  const loadDocs = async () => {
+  const loadDocs = useCallback(async () => {
     try {
       const apiDocs = await fetchDocuments();
 
@@ -130,11 +131,23 @@ export default function Documents() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadDocs();
-  }, []);
+    void loadDocs();
+  }, [loadDocs]);
+
+  useEffect(() => {
+    const hasActiveSummary = documents.some(
+      (doc) => doc.status === "PENDING" || doc.status === "PROCESSING"
+    );
+    if (!hasActiveSummary) return;
+
+    const intervalId = window.setInterval(() => {
+      void loadDocs();
+    }, 2000);
+    return () => window.clearInterval(intervalId);
+  }, [documents, loadDocs]);
 
   // Aggressive initial probe: fetch all summary types for every completed document
   // This runs once after documents are loaded to ensure summaries created on
@@ -317,7 +330,7 @@ export default function Documents() {
             },
           };
         });
-      } catch (err) {
+      } catch {
         if (cancelled) return;
         // On error, only mark the selected type as unavailable to allow retries
         setServerSummaryAvailable((prev) => {
@@ -418,7 +431,7 @@ export default function Documents() {
   };
 
   const handleSummarize = async (id: string) => {
-    setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PROCESSING" } : doc)));
+    setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
 
     try {
       const summaryType: SummaryType = summaryTypeByDocId[id] || "detailed";
@@ -433,12 +446,40 @@ export default function Documents() {
           // ignore
         }
         toast.success("Summary generated successfully!");
+      } else {
+        setDocuments((prev) => prev.map((doc) => (
+          doc.id === id ? { ...doc, status: data.status } : doc
+        )));
+        toast.success("Summary generation started.");
+
+        const completed = await waitForDocumentSummary(id, summaryType, {
+          onStatus: (status) => {
+            setDocuments((prev) => prev.map((doc) => (
+              doc.id === id ? { ...doc, status } : doc
+            )));
+          },
+        });
+        const text = completed.summaryText;
+        if (text) {
+          try {
+            localStorage.setItem(`summary-${id}`, text);
+            localStorage.setItem(summaryStorageKey(id, summaryType), text);
+            localStorage.setItem(lastSummarizedTypeKey(id), summaryType);
+          } catch {
+            // ignore
+          }
+          setServerSummaryAvailable((prev) => ({
+            ...prev,
+            [id]: { ...(prev[id] || {}), [summaryType]: true },
+          }));
+        }
+        toast.success("Summary generated successfully!");
       }
 
       await loadDocs();
 
     } catch (error) {
-      setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "PENDING" } : doc)));
+      setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status: "FAILED" } : doc)));
       toast.error(error instanceof Error ? error.message : "Failed to summarize document");
     }
   };
@@ -576,7 +617,7 @@ export default function Documents() {
       setAgentConversationId(null);
       setAgentMessages([]);
       toast.success("Agent conversation cleared");
-    } catch (err) {
+    } catch {
       toast.error("Failed to clear agent conversation");
     } finally {
       setIsClearingAgentChat(false);
@@ -699,7 +740,7 @@ export default function Documents() {
                   safeLocalStorageGet(summaryStorageKey(doc.id, selectedType)) ||
                   serverSummaryAvailable[doc.id]?.[selectedType]
                 );
-                const isProcessing = doc.status === "PROCESSING";
+                const isProcessing = doc.status === "PENDING" || doc.status === "PROCESSING";
 
                 return (
                   <motion.div
@@ -759,7 +800,7 @@ export default function Documents() {
                         {!isProcessing && hasSelectedSummary && <CheckCircle2 className="w-3 h-3" />}
                         {!isProcessing && !hasSelectedSummary && <Clock className="w-3 h-3" />}
                         <span className="capitalize">
-                          {isProcessing ? "Processing" : hasSelectedSummary ? "Summarized" : "Not summarized"}
+                          {doc.status === "PENDING" ? "Queued" : isProcessing ? "Processing" : hasSelectedSummary ? "Summarized" : "Not summarized"}
                         </span>
                       </div>
 
@@ -768,11 +809,11 @@ export default function Documents() {
                           aria-label="Summary type"
                           value={selectedType}
                           onChange={(e) => handleSummaryTypeChange(doc.id, e.target.value as SummaryType)}
-                          disabled={doc.status === "PROCESSING"}
+                          disabled={isProcessing}
                           className={`
                               h-9 px-2 rounded-lg text-xs font-medium border transition-colors
                               w-full sm:w-auto
-                              ${doc.status === "PROCESSING" ? "opacity-50 cursor-not-allowed" : ""}
+                              ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}
                               ${dark
                               ? "bg-slate-800 border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-slate-600"
                               : "bg-white border-zinc-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-300"
@@ -797,10 +838,10 @@ export default function Documents() {
                           <button
                             onClick={() => handleSummarize(doc.id)}
                             title={doc.status === "COMPLETED" ? "Generate this summary type" : "Summarize"}
-                            disabled={doc.status === "PROCESSING"}
+                            disabled={isProcessing}
                             className={`
                                 p-2 rounded-lg transition-colors
-                                ${doc.status === "PROCESSING"
+                                ${isProcessing
                                 ? "opacity-50 cursor-not-allowed"
                                 : dark
                                   ? "hover:bg-slate-700"
